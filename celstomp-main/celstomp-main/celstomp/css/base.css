@@ -1,0 +1,210 @@
+[hidden]{
+  display:none !important;
+}
+
+*{ box-sizing:border-box; }
+html,body{ 
+  height:100%; margin:0; 
+  font-family: var(--font);
+}
+html{ overflow-y: scroll; }
+
+body{
+  background:var(--bg);
+  color:var(--ink);
+
+  font-size: var(--ui-font);
+  line-height: 1.35;
+  font-family: var(--font);
+
+  overflow:hidden;               
+  overscroll-behavior:none;
+}
+
+#stage, #drawCanvas, #fxCanvas, #boundsCanvas{
+  touch-action:none;
+  -ms-touch-action:none;
+}
+#floatingIslandHeader{ touch-action: none; }
+
+button,
+input,
+select,
+textarea{
+  font-family: var(--font);
+}
+
+select{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 28px !important;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(255,255,255,.75) 50%), linear-gradient(135deg, rgba(255,255,255,.75) 50%, transparent 50%);
+  background-position: calc(100% - 12px) calc(50% - 2px), calc(100% - 7px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+select option,
+select optgroup{
+  color: #111;
+  background: #fff;
+}
+
+input[type="checkbox"]{
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid rgba(255,255,255,.34);
+  background: rgba(0,0,0,.22);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+input[type="checkbox"]::before{
+  content: "";
+  width: 9px;
+  height: 9px;
+  transform: scale(0);
+  transition: transform 120ms ease;
+  background: #8dd1ff;
+}
+
+input[type="checkbox"]:checked::before{
+  transform: scale(1);
+}
+
+input[type="checkbox"]:disabled{
+  opacity: .5;
+  cursor: default;
+}
+
+input[type="range"]{
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track{
+  height: 6px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.28);
+}
+
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 1px solid rgba(255,255,255,.5);
+  background: #cfe9ff;
+}
+
+input[type="range"]::-moz-range-track{
+  height: 6px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.28);
+}
+
+input[type="range"]::-moz-range-thumb{
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 0;
+  background: #cfe9ff;
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="range"]:focus-visible,
+select:focus-visible{
+  outline: 1px solid rgba(141,209,255,.9);
+  outline-offset: 1px;
+}
+
+:where(button, .seg input + label, .dock-btn, .edge-btn){
+  background:var(--btn-bg);
+  color:#dfe7f1;
+  border:1px solid var(--btn-bd);
+  border-radius:10px;
+  padding:8px 10px;
+  cursor:pointer;
+}
+:where(button, .seg input + label, .dock-btn, .edge-btn):hover{
+  background:var(--btn-bg-h);
+  border-color:var(--btn-bd-h);
+}
+
+.row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:6px 0;
+  flex-wrap:wrap;
+}
+.row label{
+  color:#c7d0db;
+  min-width:108px;
+}
+
+.btns{ display:flex; flex-wrap:wrap; gap:8px; }
+
+.seg{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.seg input{ display:none; }
+.seg label{
+  user-select:none;
+  padding:6px 12px;
+  height:28px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:220px;
+}
+.seg input:checked + label{
+  background:var(--btn-bg-h);
+  border-color:var(--btn-bd-h);
+}
+
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  border:1px solid var(--btn-bd);
+  border-radius:8px;
+  background:#151c26;
+  font-size:12px;
+  color:#c7d0db;
+}
+.swatch{
+  width:16px;
+  height:16px;
+  border-radius:4px;
+  border:1px solid var(--btn-bd);
+}
+
+.badge{
+  font-size:12px;
+  color:#c7d0db;
+  background:#1a2230;
+  border:1px solid var(--btn-bd);
+  border-radius:999px;
+  padding:3px 10px;
+}
+
+@media (max-width: 720px){
+  html,
+  body,
+  .app{
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}

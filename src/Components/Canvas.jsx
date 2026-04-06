@@ -1,0 +1,222 @@
+import React, { useEffect, useRef } from 'react';
+import { stampLine, drawPressureLine } from '../utils/drawingEngine';
+import HistoryManager from '../utils/historyManager';
+
+const Canvas = React.forwardRef(({ brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
+  const canvasRef = useRef(null);
+  const contextRef = useRef(null);
+  const isDrawingRef = useRef(false);
+  const lastPosRef = useRef(null);
+  const lastPressureRef = useRef(1);
+  const activePointersRef = useRef(new Set());
+  const pointerDataRef = useRef(new Map());
+  const cursorDotRef = useRef(null);
+  const historyManagerRef = useRef(new HistoryManager());
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    const context = canvas.getContext('2d');
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.lineWidth = brushRadius;
+    context.strokeStyle = brushColor;
+    contextRef.current = context;
+  }, [canvasWidth, canvasHeight, brushRadius, brushColor]);
+
+  const getCanvasPos = (clientX, clientY) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
+  const updateCursorDot = (clientX, clientY) => {
+    if (!cursorDotRef.current) return;
+    cursorDotRef.current.style.left = `${clientX}px`;
+    cursorDotRef.current.style.top = `${clientY}px`;
+    cursorDotRef.current.style.display = 'block';
+  };
+
+  const hideCursorDot = () => {
+    if (cursorDotRef.current) {
+      cursorDotRef.current.style.display = 'none';
+    }
+  };
+
+  const startDrawing = (e) => {
+    if (e.pointerType === 'touch' && activePointersRef.current.size > 0) {
+      return;
+    }
+
+    // Begin history action phase (capture "before" snapshot)
+    if (activePointersRef.current.size === 0) {
+      ref.current?.historyManager.beginAction(canvasRef.current);
+    }
+
+    activePointersRef.current.add(e.pointerId);
+    const { x, y } = getCanvasPos(e.clientX, e.clientY);
+    
+    const pointerPressure = e.pressure || 1;
+    pointerDataRef.current.set(e.pointerId, { lastX: x, lastY: y, pressure: pointerPressure });
+    
+    try {
+      canvasRef.current.setPointerCapture(e.pointerId);
+    } catch (err) {
+      // Ignore if capture fails
+    }
+
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(x, y);
+    isDrawingRef.current = true;
+    lastPosRef.current = { x, y };
+    lastPressureRef.current = pointerPressure;
+    
+    updateCursorDot(e.clientX, e.clientY);
+  };
+
+  const draw = (e) => {
+    // Update cursor dot for both drawing and hovering
+    updateCursorDot(e.clientX, e.clientY);
+
+    if (!isDrawingRef.current || !activePointersRef.current.has(e.pointerId)) return;
+
+    // Mark history action as dirty (something changed)
+    ref.current?.historyManager.markDirty();
+
+    const { x, y } = getCanvasPos(e.clientX, e.clientY);
+    const currentPressure = e.pressure || 1;
+
+    const pointerData = pointerDataRef.current.get(e.pointerId);
+    if (!pointerData) return;
+
+    const lastPressure = pointerData.pressure;
+    pointerData.pressure = currentPressure;
+    pointerData.lastX = x;
+    pointerData.lastY = y;
+
+    if (lastPosRef.current) {
+      drawPressureLine(
+        contextRef.current,
+        lastPosRef.current.x,
+        lastPosRef.current.y,
+        x,
+        y,
+        brushRadius,
+        lastPressure,
+        currentPressure,
+        brushColor,
+        1
+      );
+    }
+
+    lastPosRef.current = { x, y };
+    lastPressureRef.current = currentPressure;
+  };
+
+  const stopDrawing = (e) => {
+    activePointersRef.current.delete(e.pointerId);
+    pointerDataRef.current.delete(e.pointerId);
+
+    if (activePointersRef.current.size === 0) {
+      contextRef.current.closePath();
+      isDrawingRef.current = false;
+      lastPosRef.current = null;
+      lastPressureRef.current = 1;
+      
+      // Commit history action phase (capture "after" snapshot)
+      ref.current?.historyManager.commitAction(canvasRef.current);
+      
+      // Notify parent of history state change
+      ref.current?.onHistoryStateChange?.();
+      
+      hideCursorDot();
+    }
+
+    try {
+      canvasRef.current.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // Ignore if release fails
+    }
+  };
+
+  const handlePointerLeave = (e) => {
+    hideCursorDot();
+    stopDrawing(e);
+  };
+
+  React.useImperativeHandle(ref, () => ({
+    historyManager: historyManagerRef.current,
+    onHistoryStateChange: onHistoryStateChange,
+    undo: () => {
+      const result = historyManagerRef.current.undo(canvasRef.current);
+      if (result && onHistoryStateChange) {
+        onHistoryStateChange();
+      }
+      return result;
+    },
+    redo: () => {
+      const result = historyManagerRef.current.redo(canvasRef.current);
+      if (result && onHistoryStateChange) {
+        onHistoryStateChange();
+      }
+      return result;
+    },
+    clear: () => {
+      const canvas = canvasRef.current;
+      contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
+      historyManagerRef.current.clear();
+      if (onHistoryStateChange) {
+        onHistoryStateChange();
+      }
+    },
+    getCanvas: () => canvasRef.current,
+    getHistoryState: () => historyManagerRef.current.getState(),
+  }));
+
+  return (
+    <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+      <canvas
+        ref={canvasRef}
+        onPointerDown={startDrawing}
+        onPointerMove={draw}
+        onPointerUp={stopDrawing}
+        onPointerLeave={handlePointerLeave}
+        onPointerCancel={stopDrawing}
+        style={{
+          border: '1px solid #ccc',
+          cursor: 'none',
+          display: 'block',
+          backgroundColor: '#fff',
+          touchAction: 'none',
+        }}
+      />
+      {/* Cursor dot that follows the pointer */}
+      <div
+        ref={cursorDotRef}
+        style={{
+          position: 'fixed',
+          width: '6px',
+          height: '6px',
+          backgroundColor: brushColor,
+          borderRadius: '50%',
+          pointerEvents: 'none',
+          display: 'none',
+          transform: 'translate(-3px, -3px)',
+          boxShadow: `0 0 0 1px rgba(0,0,0,0.3)`,
+          zIndex: 1000,
+        }}
+      />
+    </div>
+  );
+});
+
+Canvas.displayName = 'Canvas';
+
+export default Canvas;

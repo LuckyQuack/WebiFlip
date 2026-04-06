@@ -1,0 +1,303 @@
+
+#tools{
+  position:fixed;
+  top: var(--header-h);
+  left: var(--dock-gap);
+  bottom: calc(var(--timeline-h) + var(--dock-gap-bottom));
+  width: var(--sidebar-w);
+
+  background: var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 12px;
+  box-shadow: 12px 0 24px rgba(0,0,0,.25);
+
+  overflow:auto;
+  z-index: 8;
+}
+#tools h2{
+  margin:0 0 8px;
+  font-size:12px;
+  color:#c7d0db;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.tool-group{
+  background:#0f141b;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px;
+  margin-bottom: 12px;
+}
+
+#toolsRight{
+  position:fixed;
+  top: var(--header-h);
+  right: var(--dock-gap);
+  bottom: calc(var(--timeline-h) + var(--dock-gap-bottom));
+  width: var(--rightbar-w);
+
+  background: var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 12px;
+  box-shadow: -12px 0 24px rgba(0,0,0,.25);
+
+  overflow:auto;
+  z-index: 8;
+}
+
+/* Collapsed states */
+.app.tl-collapsed #tools,
+.app.tl-collapsed #toolsRight{
+  bottom: var(--dock-gap-bottom);
+}
+.app.sidebar-collapsed #tools{ display:none; }
+.app.rightbar-collapsed #toolsRight{ display:none; }
+
+
+/* Edge Buttons to show/hide panels */
+.edge-btn{
+  position:fixed;
+  z-index: 11;
+  box-shadow: var(--shadowTop);
+  padding:6px 10px;
+  border-radius:8px;
+}
+#showLeftEdge{ top: calc(var(--header-h) + 8px); left: var(--dock-gap); display:none; }
+#showRightEdge{ top: calc(var(--header-h) + 8px); right: var(--dock-gap); display:none; }
+#showTimelineEdge{ bottom: 8px; left: 50%; transform: translateX(-50%); display:none; }
+
+.app.sidebar-collapsed #showLeftEdge{ display:block; }
+.app.rightbar-collapsed #showRightEdge{ display:block; }
+.app.tl-collapsed #showTimelineEdge{ display:block; }
+
+
+/* Island Tools Context */
+#islandToolsSlot{
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; 
+  align-items: center;
+  gap: 8px;
+}
+
+#islandToolsSlot #toolSeg{
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  grid-auto-rows: 34px;
+  gap: 8px;
+
+  width: fit-content;
+  max-width: 100%;
+}
+
+#islandToolsSlot #toolSeg > input{
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#islandToolsSlot #toolSeg > label{
+  width: 34px !important;
+  height: 34px !important;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto; 
+  min-width: 0;
+  padding: 0 !important;
+
+  border-radius: 0px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background-color: rgba(0,0,0,0.18);
+
+  display: grid !important;
+  place-items: center;
+
+  background-image: var(--tool-icon);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 20px 20px;
+
+  font-size: 0;
+  line-height: 0;
+  cursor: pointer;
+}
+
+#islandToolsSlot #toolSeg > label svg {
+  width: 20px;
+  height: 20px;
+  color: rgba(255,255,255,0.85);
+  position: relative;
+  z-index: 1;
+}
+
+#islandToolsSlot #toolSeg > label:has(svg) {
+  background-image: none;
+}
+
+#islandToolsSlot #toolSeg > label:has(svg)::before {
+  display: none;
+}
+
+#islandToolsSlot #toolSeg > label::before{
+  content: "";
+  width: 20px;
+  height: 20px;
+  background: rgba(255,255,255,0.92); 
+  -webkit-mask-image: var(--tool-icon);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  mask-image: var(--tool-icon);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+#islandToolsSlot #toolSeg > label[data-tool="brush"]      { --tool-icon: url("/icons/tool-brush.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="eraser"]     { --tool-icon: url("/icons/tool-eraser.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="fill-eraser"]{ --tool-icon: url("/icons/tool-fill-eraser.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="fill-brush"] { --tool-icon: url("/icons/tool-fill-brush.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="lasso-fill"] { --tool-icon: url("/icons/tool-lasso-fill.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="lasso-erase"]{ --tool-icon: url("/icons/tool-lasso-erase.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="rect-select"]{ --tool-icon: url("/icons/tool-rect-select.svg"); }
+#islandToolsSlot #toolSeg > label[data-tool="eyedropper"]{ --tool-icon: url("/icons/tool-eyedropper.svg"); }
+
+#islandToolsSlot #toolSeg > input:checked + label{
+  outline: 2px solid rgba(120, 200, 255, 0.90);
+  outline-offset: 0;
+}
+
+
+/* Tool Options Popup */
+.toolOptionsPopup{
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 9999;
+  display: none;
+  min-width: 220px;
+  max-width: 320px;
+
+  font-family: var(--font);
+  color: rgba(255,255,255,0.92);
+
+  background: rgba(18,18,18,0.98);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.55);
+
+  padding: 10px;
+}
+.toolOptionsPopup button,
+.toolOptionsPopup input{
+  font-family: inherit;
+  color: inherit;
+}
+.toolOptionsPopup.open{
+  display: block;
+}
+.toolOptionsTitle{
+  font-weight: 700;
+  font-size: 13px;
+  margin: 0 0 8px 0;
+  opacity: 0.9;
+}
+.toolOptionsBody{
+  display: grid;
+  gap: 6px;
+}
+.toolOptBtn{
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;                 
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); 
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+  appearance: none;
+}
+.toolOptBtn:hover{
+  background: rgba(255,255,255,0.07); 
+}
+.toolOptBtn:focus-visible{
+  outline: 2px solid rgba(255,255,255,0.22);
+  outline-offset: 2px;
+}
+.toolOptRow{
+  display: grid;
+  grid-template-columns: 52px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+}
+.toolOptLabel{
+  font-size: 12px;
+  opacity: 0.85;
+}
+.toolOptRange{
+  width: 100%;
+}
+.toolOptRead{
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.toolOptCheck{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+}
+.toolOptCheck:hover{
+  background: rgba(255,255,255,0.07);
+}
+.toolOptCheck input{
+  transform: translateY(0.5px);
+}
+
+@media (max-width: 720px){
+  #islandToolsSlot #toolSeg{
+    grid-template-columns: repeat(2, 30px);
+    grid-auto-rows: 30px;
+    gap: 6px;
+  }
+  #islandToolsSlot #toolSeg > label{
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 0 !important;
+  }
+  #islandToolsSlot #toolSeg > label::before{
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px){
+  #islandToolsSlot #toolSeg{
+    grid-template-columns: repeat(2, 28px);
+    grid-auto-rows: 28px;
+    gap: 6px;
+  }
+
+  #islandToolsSlot #toolSeg > label{
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  #islandToolsSlot #toolSeg > label::before{
+    width: 17px;
+    height: 17px;
+  }
+}
