@@ -5,8 +5,7 @@ const Controls = ({
   onRedo,
   onClear,
   brushRadius,
-  onIncreaseBrush,
-  onDecreaseBrush,
+  onBrushSizeChange,
   canUndo,
   canRedo,
 }) => {
@@ -22,10 +21,16 @@ const Controls = ({
         Clear
       </button>
       <div className="brush-size-control">
-        <label>Brush Size</label>
-        <button onClick={onDecreaseBrush}>-</button>
-        <span className="brush-radius-display">{brushRadius}</span>
-        <button onClick={onIncreaseBrush}>+</button>
+        <label>Brush Size: {brushRadius}</label>
+        <input
+          type="range"
+          min="1"
+          max="100"
+          value={brushRadius}
+          onChange={(e) => onBrushSizeChange(parseInt(e.target.value))}
+          className="brush-size-slider"
+          title="Drag to adjust brush size"
+        />
       </div>
     </div>
   );

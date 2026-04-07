@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { stampLine, drawPressureLine } from '../utils/drawingEngine';
 import HistoryManager from '../utils/historyManager';
 
-const Canvas = React.forwardRef(({ brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
+const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const isDrawingRef = useRef(false);
@@ -23,10 +23,18 @@ const Canvas = React.forwardRef(({ brushColor, canvasHeight, canvasWidth, brushR
     const context = canvas.getContext('2d');
     context.lineCap = 'round';
     context.lineJoin = 'round';
+    contextRef.current = context;
+  }, [canvasWidth, canvasHeight]);
+
+  // Update context properties without resetting the canvas
+  useEffect(() => {
+    const context = contextRef.current;
+    if (!context) return;
+
     context.lineWidth = brushRadius;
     context.strokeStyle = brushColor;
-    contextRef.current = context;
-  }, [canvasWidth, canvasHeight, brushRadius, brushColor]);
+    context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+  }, [brushRadius, brushColor, tool]);
 
   const getCanvasPos = (clientX, clientY) => {
     const canvas = canvasRef.current;
@@ -102,6 +110,7 @@ const Canvas = React.forwardRef(({ brushColor, canvasHeight, canvasWidth, brushR
     pointerData.lastY = y;
 
     if (lastPosRef.current) {
+      const drawColor = tool === 'eraser' ? '#000000' : brushColor;
       drawPressureLine(
         contextRef.current,
         lastPosRef.current.x,
@@ -111,7 +120,7 @@ const Canvas = React.forwardRef(({ brushColor, canvasHeight, canvasWidth, brushR
         brushRadius,
         lastPressure,
         currentPressure,
-        brushColor,
+        drawColor,
         1
       );
     }
