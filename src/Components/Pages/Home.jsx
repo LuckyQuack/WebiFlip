@@ -41,6 +41,10 @@ const Home = () => {
     return last;
   };
 
+  const getPreviousFrameIndex = (frame) => {
+    return frame > 1 ? frame - 1 : null;
+  };
+
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
       setHistoryState(canvasRef.current.getHistoryState());
@@ -75,8 +79,8 @@ const Home = () => {
     const loadFrame = () => {
       if (canvasRef.current?.loadFrameState) {
         const frameState = frameStatesRef.current[frameToLoad] || null;
-        const prevFrameIndex = frameToLoad === 1 ? 30 : frameToLoad - 1;
-        const onionSkinData = frameStatesRef.current[prevFrameIndex] || null;
+        const prevFrameIndex = getPreviousFrameIndex(frameToLoad);
+        const onionSkinData = prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
         canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
         
         // Restore history for this frame
@@ -99,8 +103,8 @@ const Home = () => {
     if (!canvasRef.current?.loadFrameState) return;
     
     const frameState = frameStatesRef.current[currentFrame] || null;
-    const prevFrameIndex = currentFrame === 1 ? 30 : currentFrame - 1;
-    const onionSkinData = frameStatesRef.current[prevFrameIndex] || null;
+    const prevFrameIndex = getPreviousFrameIndex(currentFrame);
+    const onionSkinData = prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
     canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
   }, [onionSkinEnabled]);
 
@@ -165,12 +169,19 @@ const Home = () => {
     const interval = setInterval(() => {
       setCurrentFrame((prev) => {
         const lastFrame = getLastDrawnFrame();
-        return prev >= lastFrame ? 1 : prev + 1;
+        if (prev >= lastFrame) {
+          if (loopEnabled) {
+            return 1;
+          }
+          setIsPlaying(false);
+          return prev;
+        }
+        return prev + 1;
       });
     }, 1000 / playFps);
 
     return () => clearInterval(interval);
-  }, [isPlaying, playFps]);
+  }, [isPlaying, playFps, loopEnabled]);
 
   const handleBrushSizeChange = (value) => {
     setBrushRadius(value);
@@ -535,7 +546,7 @@ const Home = () => {
               brushRadius={brushRadius}
               onHistoryStateChange={handleHistoryStateChange}
               onionSkinEnabled={onionSkinEnabled}
-              onionSkinImageData={frameStatesRef.current[currentFrame === 1 ? 30 : currentFrame - 1]}
+              onionSkinImageData={getPreviousFrameIndex(currentFrame) ? frameStatesRef.current[currentFrame - 1] : null}
             />
           </div>
         </section>

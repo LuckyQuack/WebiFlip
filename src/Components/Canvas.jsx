@@ -13,6 +13,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const cursorDotRef = useRef(null);
   const historyManagerRef = useRef(new HistoryManager());
   const frameStateRef = useRef(null);
+  const offscreenCanvasRef = useRef(document.createElement('canvas'));
 
   // Helper to check if ImageData has any visible content
   const hasContent = (imageData) => {
@@ -24,6 +25,18 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     }
     return false;
   };
+
+  const drawImageDataWithAlpha = (context, imageData, alpha) => {
+    if (!imageData) return;
+    const offscreen = offscreenCanvasRef.current;
+    offscreen.width = imageData.width;
+    offscreen.height = imageData.height;
+    const offscreenCtx = offscreen.getContext('2d');
+    offscreenCtx.putImageData(imageData, 0, 0);
+    context.globalAlpha = alpha;
+    context.drawImage(offscreen, 0, 0);
+    context.globalAlpha = 1.0;
+  }; 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -168,9 +181,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
         context.clearRect(0, 0, canvas.width, canvas.height);
         
         if (hasContent(onionSkinImageData)) {
-          context.globalAlpha = 0.5;
-          context.putImageData(onionSkinImageData, 0, 0);
-          context.globalAlpha = 1.0;
+          drawImageDataWithAlpha(context, onionSkinImageData, 0.5);
         }
         
         context.putImageData(frameStateRef.current, 0, 0);
@@ -228,28 +239,24 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     },
     loadFrameState: (imageData, onionSkinImageData, onionSkinEnabled) => {
       if (!contextRef.current || !canvasRef.current) return;
-      if (!imageData) {
-        contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        frameStateRef.current = null;
-      } else {
-        frameStateRef.current = imageData;
-        const canvas = canvasRef.current;
-        const context = contextRef.current;
-        
-        // Clear and render frame with onion skin
-        context.globalAlpha = 1.0;
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw onion skin if enabled and has content
-        if (onionSkinEnabled && hasContent(onionSkinImageData)) {
-          context.globalAlpha = 0.5;
-          context.putImageData(onionSkinImageData, 0, 0);
-          context.globalAlpha = 1.0;
-        }
-        
-        // Draw current frame on top
-        context.putImageData(imageData, 0, 0);
+      const canvas = canvasRef.current;
+      const context = contextRef.current;
+
+      context.globalAlpha = 1.0;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw onion skin if enabled and has content
+      if (onionSkinEnabled && hasContent(onionSkinImageData)) {
+        drawImageDataWithAlpha(context, onionSkinImageData, 0.5);
       }
+
+      if (!imageData) {
+        frameStateRef.current = null;
+        return;
+      }
+
+      frameStateRef.current = imageData;
+      context.putImageData(imageData, 0, 0);
     },
     saveFrameState: (imageData) => {
       if (imageData) {
