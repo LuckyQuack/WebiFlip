@@ -9,6 +9,8 @@ const Home = () => {
   const [currentFrame, setCurrentFrame] = useState(1);
   const [onionSkinEnabled, setOnionSkinEnabled] = useState(true);
   const [loopEnabled, setLoopEnabled] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playFps, setPlayFps] = useState(6);
   const [title, setTitle] = useState('');
   const [metaLeft, setMetaLeft] = useState('');
   const [metaRight, setMetaRight] = useState('');
@@ -19,6 +21,25 @@ const Home = () => {
   const frameHistoryRef = useRef({});
   const previousFrameRef = useRef(1);
   const frames = Array.from({ length: 30 }, (_, index) => index + 1);
+
+  const hasFrameContent = (imageData) => {
+    if (!imageData) return false;
+    const data = imageData.data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] !== 0) return true;
+    }
+    return false;
+  };
+
+  const getLastDrawnFrame = () => {
+    let last = 1;
+    frames.forEach((frame) => {
+      if (hasFrameContent(frameStatesRef.current[frame])) {
+        last = frame;
+      }
+    });
+    return last;
+  };
 
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
@@ -114,6 +135,42 @@ const Home = () => {
       frameStatesRef.current[currentFrame] = null;
     }
   };
+
+  const handleTogglePlay = () => {
+    const lastFrame = getLastDrawnFrame();
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+
+    setCurrentFrame(1);
+    if (lastFrame > 1) {
+      setIsPlaying(true);
+    }
+  };
+
+  const handleMoveLeft = () => {
+    setIsPlaying(false);
+    setCurrentFrame((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleMoveRight = () => {
+    setIsPlaying(false);
+    setCurrentFrame((prev) => Math.min(30, prev + 1));
+  };
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setCurrentFrame((prev) => {
+        const lastFrame = getLastDrawnFrame();
+        return prev >= lastFrame ? 1 : prev + 1;
+      });
+    }, 1000 / playFps);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, playFps]);
 
   const handleBrushSizeChange = (value) => {
     setBrushRadius(value);
@@ -410,13 +467,44 @@ const Home = () => {
                 <button
                   key={frame}
                   type="button"
-                  onClick={() => setCurrentFrame(frame)}
+                  onClick={() => {
+                    setIsPlaying(false);
+                    setCurrentFrame(frame);
+                  }}
                   className={`frame-thumb ${currentFrame === frame ? 'frame-thumb-active' : ''}`}
                 >
                   <div className="frame-box" />
                   <span className="frame-label">{frame}</span>
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="playback-controls">
+            <button className="playback-button" type="button" onClick={handleMoveLeft} disabled={currentFrame === 1}>
+              ◀
+            </button>
+            <button className="playback-button" type="button" onClick={handleTogglePlay}>
+              {isPlaying ? 'Pause' : 'Play'}
+            </button>
+            <button
+              className="playback-button"
+              type="button"
+              onClick={handleMoveRight}
+              disabled={currentFrame === 30}
+            >
+              ▶
+            </button>
+            <div className="playback-speed">
+              <label htmlFor="fps-slider">FPS: {playFps}</label>
+              <input
+                id="fps-slider"
+                type="range"
+                min="1"
+                max="12"
+                value={playFps}
+                onChange={(e) => setPlayFps(Number(e.target.value))}
+                className="fps-slider"
+              />
             </div>
           </div>
         </section>
