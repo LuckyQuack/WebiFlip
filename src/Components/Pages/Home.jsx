@@ -15,7 +15,10 @@ const Home = () => {
   const [description, setDescription] = useState('');
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const canvasRef = useRef(null);
-  const frames = Array.from({ length: 12 }, (_, index) => index + 1);
+  const frameStatesRef = useRef({});
+  const frameHistoryRef = useRef({});
+  const previousFrameRef = useRef(1);
+  const frames = Array.from({ length: 30 }, (_, index) => index + 1);
 
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
@@ -23,9 +26,73 @@ const Home = () => {
     }
   }, []);
 
+  // Handle frame switching - save current frame, load new frame
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    // Only proceed if we're actually switching frames
+    if (previousFrameRef.current === currentFrame) return;
+
+    // Save the frame we're leaving
+    const frameToSave = previousFrameRef.current;
+    const frameToLoad = currentFrame;
+
+    const saveFrame = () => {
+      if (canvasRef.current?.captureFrameState) {
+        const frameState = canvasRef.current.captureFrameState();
+        if (frameState) {
+          frameStatesRef.current[frameToSave] = frameState;
+        }
+      }
+      // Save history for this frame
+      if (canvasRef.current?.historyManager?.getFullState) {
+        const historyState = canvasRef.current.historyManager.getFullState();
+        frameHistoryRef.current[frameToSave] = historyState;
+      }
+    };
+
+    const loadFrame = () => {
+      if (canvasRef.current?.loadFrameState) {
+        const frameState = frameStatesRef.current[frameToLoad] || null;
+        const prevFrameIndex = frameToLoad === 1 ? 30 : frameToLoad - 1;
+        const onionSkinData = frameStatesRef.current[prevFrameIndex] || null;
+        canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
+        
+        // Restore history for this frame
+        if (canvasRef.current?.historyManager?.restoreFullState) {
+          const historyState = frameHistoryRef.current[frameToLoad] || null;
+          canvasRef.current.historyManager.restoreFullState(historyState);
+        }
+        
+        setHistoryState(canvasRef.current.historyManager.getState());
+      }
+    };
+
+    saveFrame();
+    loadFrame();
+    previousFrameRef.current = frameToLoad;
+  }, [currentFrame, onionSkinEnabled]);
+
+  // Re-render current frame when onion skin toggle changes
+  useEffect(() => {
+    if (!canvasRef.current?.loadFrameState) return;
+    
+    const frameState = frameStatesRef.current[currentFrame] || null;
+    const prevFrameIndex = currentFrame === 1 ? 30 : currentFrame - 1;
+    const onionSkinData = frameStatesRef.current[prevFrameIndex] || null;
+    canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
+  }, [onionSkinEnabled]);
+
   const handleHistoryStateChange = () => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
       setHistoryState(canvasRef.current.getHistoryState());
+    }
+    // Auto-save current frame state after any drawing change
+    if (canvasRef.current?.captureFrameState) {
+      const frameState = canvasRef.current.captureFrameState();
+      if (frameState) {
+        frameStatesRef.current[currentFrame] = frameState;
+      }
     }
   };
 
@@ -44,6 +111,7 @@ const Home = () => {
   const handleClear = () => {
     if (canvasRef.current) {
       canvasRef.current.clear();
+      frameStatesRef.current[currentFrame] = null;
     }
   };
 
@@ -336,20 +404,20 @@ const Home = () => {
 
       <main className="main-content">
         <section className="timeline-bar">
-          <div className="frames-row">
-            {frames.map((frame) => (
-              <button
-                key={frame}
-                type="button"
-                onClick={() => setCurrentFrame(frame)}
-                className={`frame-thumb ${currentFrame === frame ? 'frame-thumb-active' : ''}`}
-              >
-                <div className="frame-box">
-                  {frame === 1 && <div className="frame-icon">+</div>}
-                </div>
-                <span className="frame-label">{frame}</span>
-              </button>
-            ))}
+          <div className="frames-box">
+            <div className="frames-row">
+              {frames.map((frame) => (
+                <button
+                  key={frame}
+                  type="button"
+                  onClick={() => setCurrentFrame(frame)}
+                  className={`frame-thumb ${currentFrame === frame ? 'frame-thumb-active' : ''}`}
+                >
+                  <div className="frame-box" />
+                  <span className="frame-label">{frame}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -378,6 +446,8 @@ const Home = () => {
               canvasWidth={550}
               brushRadius={brushRadius}
               onHistoryStateChange={handleHistoryStateChange}
+              onionSkinEnabled={onionSkinEnabled}
+              onionSkinImageData={frameStatesRef.current[currentFrame === 1 ? 30 : currentFrame - 1]}
             />
           </div>
         </section>

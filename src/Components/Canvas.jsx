@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { stampLine, drawPressureLine } from '../utils/drawingEngine';
 import HistoryManager from '../utils/historyManager';
 
-const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
+const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange, onionSkinEnabled, onionSkinImageData }, ref) => {
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const isDrawingRef = useRef(false);
@@ -12,6 +12,18 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const pointerDataRef = useRef(new Map());
   const cursorDotRef = useRef(null);
   const historyManagerRef = useRef(new HistoryManager());
+  const frameStateRef = useRef(null);
+
+  // Helper to check if ImageData has any visible content
+  const hasContent = (imageData) => {
+    if (!imageData) return false;
+    const data = imageData.data;
+    // Check if any pixel has alpha > 0 (has some content)
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -142,6 +154,28 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
       // Commit history action phase (capture "after" snapshot)
       ref.current?.historyManager.commitAction(canvasRef.current);
       
+      // Save frame state immediately after drawing completes
+      if (ref.current?.saveFrameState) {
+        const frameState = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+        ref.current.saveFrameState(frameState);
+      }
+      
+      // Re-render with onion skin if enabled
+      if (onionSkinEnabled && frameStateRef.current) {
+        const canvas = canvasRef.current;
+        const context = contextRef.current;
+        context.globalAlpha = 1.0;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (hasContent(onionSkinImageData)) {
+          context.globalAlpha = 0.5;
+          context.putImageData(onionSkinImageData, 0, 0);
+          context.globalAlpha = 1.0;
+        }
+        
+        context.putImageData(frameStateRef.current, 0, 0);
+      }
+      
       // Notify parent of history state change
       ref.current?.onHistoryStateChange?.();
       
@@ -181,12 +215,47 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
       const canvas = canvasRef.current;
       contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
       historyManagerRef.current.clear();
+      frameStateRef.current = null;
       if (onHistoryStateChange) {
         onHistoryStateChange();
       }
     },
     getCanvas: () => canvasRef.current,
     getHistoryState: () => historyManagerRef.current.getState(),
+    captureFrameState: () => {
+      if (!contextRef.current || !canvasRef.current) return null;
+      return contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    },
+    loadFrameState: (imageData, onionSkinImageData, onionSkinEnabled) => {
+      if (!contextRef.current || !canvasRef.current) return;
+      if (!imageData) {
+        contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        frameStateRef.current = null;
+      } else {
+        frameStateRef.current = imageData;
+        const canvas = canvasRef.current;
+        const context = contextRef.current;
+        
+        // Clear and render frame with onion skin
+        context.globalAlpha = 1.0;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw onion skin if enabled and has content
+        if (onionSkinEnabled && hasContent(onionSkinImageData)) {
+          context.globalAlpha = 0.5;
+          context.putImageData(onionSkinImageData, 0, 0);
+          context.globalAlpha = 1.0;
+        }
+        
+        // Draw current frame on top
+        context.putImageData(imageData, 0, 0);
+      }
+    },
+    saveFrameState: (imageData) => {
+      if (imageData) {
+        frameStateRef.current = imageData;
+      }
+    },
   }));
 
   return (

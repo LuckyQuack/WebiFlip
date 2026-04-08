@@ -162,6 +162,31 @@ class HistoryManager {
       canRedo: this.canRedo(),
     };
   }
+
+  /**
+   * Save full history state for frame persistence
+   */
+  getFullState() {
+    return {
+      undoStack: this.undoStack,
+      redoStack: this.redoStack,
+      pendingAction: this.pendingAction,
+    };
+  }
+
+  /**
+   * Restore full history state from saved frame
+   */
+  restoreFullState(state) {
+    if (!state) {
+      this.clear();
+      return;
+    }
+    this.undoStack = state.undoStack || [];
+    this.redoStack = state.redoStack || [];
+    this.pendingAction = state.pendingAction || null;
+    this.isDirty = false;
+  }
 }
 
 export default HistoryManager;
