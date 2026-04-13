@@ -4,6 +4,51 @@ import { encodeGif } from '../../utils/gifEncoder';
 import './Home.css';
 
 const CANVAS_SIZE = 550;
+const FRAME_THUMBNAIL_WIDTH = 48;
+const FRAME_THUMBNAIL_HEIGHT = 32;
+
+const FrameThumbnail = ({ imageData, version }) => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#f5f5f5';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!imageData) return;
+
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = imageData.width;
+    offscreenCanvas.height = imageData.height;
+    const offscreenContext = offscreenCanvas.getContext('2d');
+    offscreenContext.putImageData(imageData, 0, 0);
+
+    const scale = Math.min(
+      canvas.width / offscreenCanvas.width,
+      canvas.height / offscreenCanvas.height
+    );
+    const drawWidth = offscreenCanvas.width * scale;
+    const drawHeight = offscreenCanvas.height * scale;
+    const offsetX = (canvas.width - drawWidth) / 2;
+    const offsetY = (canvas.height - drawHeight) / 2;
+
+    context.drawImage(offscreenCanvas, offsetX, offsetY, drawWidth, drawHeight);
+  }, [imageData, version]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="frame-thumbnail"
+      width={FRAME_THUMBNAIL_WIDTH}
+      height={FRAME_THUMBNAIL_HEIGHT}
+      aria-hidden="true"
+    />
+  );
+};
 
 const Home = () => {
   const [tool, setTool] = useState('brush');
@@ -19,6 +64,7 @@ const Home = () => {
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExportingGif, setIsExportingGif] = useState(false);
+  const [thumbnailVersion, setThumbnailVersion] = useState(0);
   const canvasRef = useRef(null);
   const frameStatesRef = useRef({});
   const frameHistoryRef = useRef({});
@@ -59,6 +105,7 @@ const Home = () => {
 
     const frameState = canvasRef.current.captureFrameState();
     frameStatesRef.current[currentFrame] = frameState || null;
+    setThumbnailVersion((prev) => prev + 1);
   };
 
   const getLastDrawnFrameOrNull = () => {
@@ -165,15 +212,14 @@ const Home = () => {
     const saveFrame = () => {
       if (canvasRef.current?.captureFrameState) {
         const frameState = canvasRef.current.captureFrameState();
-        if (frameState) {
-          frameStatesRef.current[frameToSave] = frameState;
-        }
+        frameStatesRef.current[frameToSave] = frameState || null;
       }
       // Save history for this frame
       if (canvasRef.current?.historyManager?.getFullState) {
         const historyState = canvasRef.current.historyManager.getFullState();
         frameHistoryRef.current[frameToSave] = historyState;
       }
+      setThumbnailVersion((prev) => prev + 1);
     };
 
     const loadFrame = () => {
@@ -227,6 +273,7 @@ const Home = () => {
     if (canvasRef.current) {
       canvasRef.current.clear();
       frameStatesRef.current[currentFrame] = null;
+      setThumbnailVersion((prev) => prev + 1);
     }
   };
 
@@ -575,7 +622,12 @@ const Home = () => {
                   }}
                   className={`frame-thumb ${currentFrame === frame ? 'frame-thumb-active' : ''}`}
                 >
-                  <div className="frame-box" />
+                  <div className="frame-box">
+                    <FrameThumbnail
+                      imageData={frameStatesRef.current[frame] || null}
+                      version={thumbnailVersion}
+                    />
+                  </div>
                   <span className="frame-label">{frame}</span>
                 </button>
               ))}
