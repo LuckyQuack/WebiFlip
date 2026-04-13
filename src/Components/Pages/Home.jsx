@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Canvas from '../Canvas';
+import { encodeGif } from '../../utils/gifEncoder';
 import './Home.css';
+
+const CANVAS_SIZE = 550;
 
 const Home = () => {
   const [tool, setTool] = useState('brush');
@@ -12,14 +15,15 @@ const Home = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playFps, setPlayFps] = useState(6);
   const [title, setTitle] = useState('');
-  const [metaLeft, setMetaLeft] = useState('');
-  const [metaRight, setMetaRight] = useState('');
   const [description, setDescription] = useState('');
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isExportingGif, setIsExportingGif] = useState(false);
   const canvasRef = useRef(null);
   const frameStatesRef = useRef({});
   const frameHistoryRef = useRef({});
   const previousFrameRef = useRef(1);
+  const exportMenuRef = useRef(null);
   const frames = Array.from({ length: 30 }, (_, index) => index + 1);
 
   const hasFrameContent = (imageData) => {
@@ -50,10 +54,101 @@ const Home = () => {
     return prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
   };
 
+  const saveCurrentFrameState = () => {
+    if (!canvasRef.current?.captureFrameState) return;
+
+    const frameState = canvasRef.current.captureFrameState();
+    frameStatesRef.current[currentFrame] = frameState || null;
+  };
+
+  const getLastDrawnFrameOrNull = () => {
+    let last = null;
+    frames.forEach((frame) => {
+      if (hasFrameContent(frameStatesRef.current[frame])) {
+        last = frame;
+      }
+    });
+    return last;
+  };
+
+  const getExportFileName = () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return 'flipbook-animation.gif';
+    }
+
+    const safeTitle = trimmedTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return `${safeTitle || 'flipbook-animation'}.gif`;
+  };
+
+  const downloadBlob = (blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportGif = async () => {
+    if (isExportingGif) return;
+
+    saveCurrentFrameState();
+    const lastDrawnFrame = getLastDrawnFrameOrNull();
+
+    if (!lastDrawnFrame) {
+      window.alert('Draw at least one frame before exporting a GIF.');
+      return;
+    }
+
+    setIsExportMenuOpen(false);
+    setIsExportingGif(true);
+
+    try {
+      const framesToExport = [];
+      for (let frame = 1; frame <= lastDrawnFrame; frame += 1) {
+        framesToExport.push(frameStatesRef.current[frame] || null);
+      }
+
+      const gifBytes = encodeGif({
+        width: CANVAS_SIZE,
+        height: CANVAS_SIZE,
+        frames: framesToExport,
+        fps: playFps,
+        loop: loopEnabled,
+      });
+
+      const gifBlob = new Blob([gifBytes], { type: 'image/gif' });
+      downloadBlob(gifBlob, getExportFileName());
+    } catch (error) {
+      console.error('GIF export failed:', error);
+      window.alert('GIF export failed. Please try again.');
+    } finally {
+      setIsExportingGif(false);
+    }
+  };
+
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
       setHistoryState(canvasRef.current.getHistoryState());
     }
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!exportMenuRef.current?.contains(event.target)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
   }, []);
 
   // Handle frame switching - save current frame, load new frame
@@ -113,13 +208,7 @@ const Home = () => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
       setHistoryState(canvasRef.current.getHistoryState());
     }
-    // Auto-save current frame state after any drawing change
-    if (canvasRef.current?.captureFrameState) {
-      const frameState = canvasRef.current.captureFrameState();
-      if (frameState) {
-        frameStatesRef.current[currentFrame] = frameState;
-      }
-    }
+    saveCurrentFrameState();
   };
 
   const handleUndo = () => {
@@ -438,23 +527,6 @@ const Home = () => {
           />
         </div>
 
-        <div className="sidebar-block split-inputs">
-          <input
-            type="text"
-            value={metaLeft}
-            onChange={(e) => setMetaLeft(e.target.value)}
-            className="sidebar-input"
-            placeholder="Label"
-          />
-          <input
-            type="text"
-            value={metaRight}
-            onChange={(e) => setMetaRight(e.target.value)}
-            className="sidebar-input"
-            placeholder="Value"
-          />
-        </div>
-
         <div className="sidebar-block description-block">
           <textarea
             value={description}
@@ -464,11 +536,29 @@ const Home = () => {
           />
         </div>
 
-        <div className="sidebar-block toolbar-row">
-          <span>Export</span>
-          <span className="toolbar-icon">▾</span>
+        <div className="sidebar-block export-menu" ref={exportMenuRef}>
+          <button
+            type="button"
+            className="export-trigger"
+            onClick={() => setIsExportMenuOpen((prev) => !prev)}
+            disabled={isExportingGif}
+          >
+            <span>{isExportingGif ? 'Exporting...' : 'Export'}</span>
+            <span className="toolbar-icon">{isExportMenuOpen ? '-' : '+'}</span>
+          </button>
+          {isExportMenuOpen ? (
+            <div className="export-dropdown">
+              <button
+                type="button"
+                className="export-option"
+                onClick={handleExportGif}
+                disabled={isExportingGif}
+              >
+                GIF Export
+              </button>
+            </div>
+          ) : null}
         </div>
-        <div className="sidebar-block export-blank" />
       </aside>
 
       <main className="main-content">
@@ -542,8 +632,8 @@ const Home = () => {
               ref={canvasRef}
               tool={tool}
               brushColor={brushColor}
-              canvasHeight={550}
-              canvasWidth={550}
+              canvasHeight={CANVAS_SIZE}
+              canvasWidth={CANVAS_SIZE}
               brushRadius={brushRadius}
               onHistoryStateChange={handleHistoryStateChange}
             />
