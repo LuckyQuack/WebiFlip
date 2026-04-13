@@ -2,9 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { stampLine, drawPressureLine } from '../utils/drawingEngine';
 import HistoryManager from '../utils/historyManager';
 
-const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange, onionSkinEnabled, onionSkinImageData }, ref) => {
+const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
   const canvasRef = useRef(null);
+  const onionSkinCanvasRef = useRef(null);
   const contextRef = useRef(null);
+  const onionSkinContextRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef(null);
   const lastPressureRef = useRef(1);
@@ -13,6 +15,10 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const cursorDotRef = useRef(null);
   const historyManagerRef = useRef(new HistoryManager());
   const frameStateRef = useRef(null);
+  const onionSkinStateRef = useRef({
+    enabled: false,
+    imageData: null,
+  });
   const offscreenCanvasRef = useRef(document.createElement('canvas'));
 
   // Helper to check if ImageData has any visible content
@@ -36,19 +42,62 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     context.globalAlpha = alpha;
     context.drawImage(offscreen, 0, 0);
     context.globalAlpha = 1.0;
-  }; 
+  };
+
+  const captureCurrentFrameState = () => {
+    if (!contextRef.current || !canvasRef.current) return null;
+    return contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+  };
+
+  const renderCurrentFrame = (imageData) => {
+    const canvas = canvasRef.current;
+    const context = contextRef.current;
+    if (!canvas || !context) return;
+
+    context.globalAlpha = 1.0;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!imageData) return;
+    context.putImageData(imageData, 0, 0);
+  };
+
+  const renderOnionSkin = (imageData, enabled) => {
+    const canvas = onionSkinCanvasRef.current;
+    const context = onionSkinContextRef.current;
+    if (!canvas || !context) return;
+
+    onionSkinStateRef.current = {
+      enabled,
+      imageData,
+    };
+
+    context.globalAlpha = 1.0;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (enabled && hasContent(imageData)) {
+      drawImageDataWithAlpha(context, imageData, 0.5);
+    }
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const onionCanvas = onionSkinCanvasRef.current;
+    if (!canvas || !onionCanvas) return;
 
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
+    onionCanvas.width = canvasWidth;
+    onionCanvas.height = canvasHeight;
 
     const context = canvas.getContext('2d');
+    const onionSkinContext = onionCanvas.getContext('2d');
     context.lineCap = 'round';
     context.lineJoin = 'round';
     contextRef.current = context;
+    onionSkinContextRef.current = onionSkinContext;
+
+    renderCurrentFrame(frameStateRef.current);
+    renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
   }, [canvasWidth, canvasHeight]);
 
   // Update context properties without resetting the canvas
@@ -168,23 +217,9 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
       ref.current?.historyManager.commitAction(canvasRef.current);
       
       // Save frame state immediately after drawing completes
-      if (ref.current?.saveFrameState) {
-        const frameState = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      if (ref.current?.saveFrameState && canvasRef.current) {
+        const frameState = captureCurrentFrameState();
         ref.current.saveFrameState(frameState);
-      }
-      
-      // Re-render with onion skin if enabled
-      if (onionSkinEnabled && frameStateRef.current) {
-        const canvas = canvasRef.current;
-        const context = contextRef.current;
-        context.globalAlpha = 1.0;
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        
-        if (hasContent(onionSkinImageData)) {
-          drawImageDataWithAlpha(context, onionSkinImageData, 0.5);
-        }
-        
-        context.putImageData(frameStateRef.current, 0, 0);
       }
       
       // Notify parent of history state change
@@ -210,15 +245,21 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     onHistoryStateChange: onHistoryStateChange,
     undo: () => {
       const result = historyManagerRef.current.undo(canvasRef.current);
-      if (result && onHistoryStateChange) {
-        onHistoryStateChange();
+      if (result) {
+        frameStateRef.current = captureCurrentFrameState();
+        if (onHistoryStateChange) {
+          onHistoryStateChange();
+        }
       }
       return result;
     },
     redo: () => {
       const result = historyManagerRef.current.redo(canvasRef.current);
-      if (result && onHistoryStateChange) {
-        onHistoryStateChange();
+      if (result) {
+        frameStateRef.current = captureCurrentFrameState();
+        if (onHistoryStateChange) {
+          onHistoryStateChange();
+        }
       }
       return result;
     },
@@ -227,6 +268,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
       contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
       historyManagerRef.current.clear();
       frameStateRef.current = null;
+      renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
       if (onHistoryStateChange) {
         onHistoryStateChange();
       }
@@ -234,39 +276,31 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     getCanvas: () => canvasRef.current,
     getHistoryState: () => historyManagerRef.current.getState(),
     captureFrameState: () => {
-      if (!contextRef.current || !canvasRef.current) return null;
-      return contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      return frameStateRef.current;
     },
     loadFrameState: (imageData, onionSkinImageData, onionSkinEnabled) => {
-      if (!contextRef.current || !canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const context = contextRef.current;
-
-      context.globalAlpha = 1.0;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw onion skin if enabled and has content
-      if (onionSkinEnabled && hasContent(onionSkinImageData)) {
-        drawImageDataWithAlpha(context, onionSkinImageData, 0.5);
-      }
-
-      if (!imageData) {
-        frameStateRef.current = null;
-        return;
-      }
-
       frameStateRef.current = imageData;
-      context.putImageData(imageData, 0, 0);
+      renderCurrentFrame(imageData);
+      renderOnionSkin(onionSkinImageData, onionSkinEnabled);
     },
     saveFrameState: (imageData) => {
-      if (imageData) {
-        frameStateRef.current = imageData;
-      }
+      frameStateRef.current = imageData;
     },
   }));
 
   return (
     <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+      <canvas
+        ref={onionSkinCanvasRef}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'block',
+          pointerEvents: 'none',
+          backgroundColor: '#fff',
+        }}
+      />
       <canvas
         ref={canvasRef}
         onPointerDown={startDrawing}
@@ -275,11 +309,13 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
         onPointerLeave={handlePointerLeave}
         onPointerCancel={stopDrawing}
         style={{
+          position: 'relative',
           border: '1px solid #ccc',
           cursor: 'none',
           display: 'block',
-          backgroundColor: '#fff',
+          backgroundColor: 'transparent',
           touchAction: 'none',
+          zIndex: 1,
         }}
       />
       {/* Cursor dot that follows the pointer */}

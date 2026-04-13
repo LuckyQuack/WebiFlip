@@ -45,6 +45,11 @@ const Home = () => {
     return frame > 1 ? frame - 1 : null;
   };
 
+  const getOnionSkinData = (frame) => {
+    const prevFrameIndex = getPreviousFrameIndex(frame);
+    return prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
+  };
+
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
       setHistoryState(canvasRef.current.getHistoryState());
@@ -79,9 +84,7 @@ const Home = () => {
     const loadFrame = () => {
       if (canvasRef.current?.loadFrameState) {
         const frameState = frameStatesRef.current[frameToLoad] || null;
-        const prevFrameIndex = getPreviousFrameIndex(frameToLoad);
-        const onionSkinData = prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
-        canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
+        canvasRef.current.loadFrameState(frameState, getOnionSkinData(frameToLoad), onionSkinEnabled);
         
         // Restore history for this frame
         if (canvasRef.current?.historyManager?.restoreFullState) {
@@ -96,16 +99,14 @@ const Home = () => {
     saveFrame();
     loadFrame();
     previousFrameRef.current = frameToLoad;
-  }, [currentFrame, onionSkinEnabled]);
+  }, [currentFrame]);
 
   // Re-render current frame when onion skin toggle changes
   useEffect(() => {
     if (!canvasRef.current?.loadFrameState) return;
     
     const frameState = frameStatesRef.current[currentFrame] || null;
-    const prevFrameIndex = getPreviousFrameIndex(currentFrame);
-    const onionSkinData = prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
-    canvasRef.current.loadFrameState(frameState, onionSkinData, onionSkinEnabled);
+    canvasRef.current.loadFrameState(frameState, getOnionSkinData(currentFrame), onionSkinEnabled);
   }, [onionSkinEnabled]);
 
   const handleHistoryStateChange = () => {
@@ -545,8 +546,6 @@ const Home = () => {
               canvasWidth={550}
               brushRadius={brushRadius}
               onHistoryStateChange={handleHistoryStateChange}
-              onionSkinEnabled={onionSkinEnabled}
-              onionSkinImageData={getPreviousFrameIndex(currentFrame) ? frameStatesRef.current[currentFrame - 1] : null}
             />
           </div>
         </section>
