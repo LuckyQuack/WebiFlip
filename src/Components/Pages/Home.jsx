@@ -1,54 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Canvas from '../Canvas';
-import { encodeGif } from '../../utils/gifEncoder';
+import ExportMenu from '../ExportMenu';
+import FrameTimeline from '../FrameTimeline';
+import { buildGifExport, downloadBlob, getGifExportFileName } from '../../utils/gifExport';
 import './Home.css';
 
 const CANVAS_SIZE = 550;
-const FRAME_THUMBNAIL_WIDTH = 48;
-const FRAME_THUMBNAIL_HEIGHT = 32;
-
-const FrameThumbnail = ({ imageData, version }) => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const context = canvas.getContext('2d');
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#f5f5f5';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (!imageData) return;
-
-    const offscreenCanvas = document.createElement('canvas');
-    offscreenCanvas.width = imageData.width;
-    offscreenCanvas.height = imageData.height;
-    const offscreenContext = offscreenCanvas.getContext('2d');
-    offscreenContext.putImageData(imageData, 0, 0);
-
-    const scale = Math.min(
-      canvas.width / offscreenCanvas.width,
-      canvas.height / offscreenCanvas.height
-    );
-    const drawWidth = offscreenCanvas.width * scale;
-    const drawHeight = offscreenCanvas.height * scale;
-    const offsetX = (canvas.width - drawWidth) / 2;
-    const offsetY = (canvas.height - drawHeight) / 2;
-
-    context.drawImage(offscreenCanvas, offsetX, offsetY, drawWidth, drawHeight);
-  }, [imageData, version]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="frame-thumbnail"
-      width={FRAME_THUMBNAIL_WIDTH}
-      height={FRAME_THUMBNAIL_HEIGHT}
-      aria-hidden="true"
-    />
-  );
-};
 
 const Home = () => {
   const [tool, setTool] = useState('brush');
@@ -62,14 +19,12 @@ const Home = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExportingGif, setIsExportingGif] = useState(false);
   const [thumbnailVersion, setThumbnailVersion] = useState(0);
   const canvasRef = useRef(null);
   const frameStatesRef = useRef({});
   const frameHistoryRef = useRef({});
   const previousFrameRef = useRef(1);
-  const exportMenuRef = useRef(null);
   const frames = Array.from({ length: 30 }, (_, index) => index + 1);
 
   const hasFrameContent = (imageData) => {
@@ -108,71 +63,29 @@ const Home = () => {
     setThumbnailVersion((prev) => prev + 1);
   };
 
-  const getLastDrawnFrameOrNull = () => {
-    let last = null;
-    frames.forEach((frame) => {
-      if (hasFrameContent(frameStatesRef.current[frame])) {
-        last = frame;
-      }
-    });
-    return last;
-  };
-
-  const getExportFileName = () => {
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      return 'flipbook-animation.gif';
-    }
-
-    const safeTitle = trimmedTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    return `${safeTitle || 'flipbook-animation'}.gif`;
-  };
-
-  const downloadBlob = (blob, fileName) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const handleExportGif = async () => {
     if (isExportingGif) return;
 
     saveCurrentFrameState();
-    const lastDrawnFrame = getLastDrawnFrameOrNull();
-
-    if (!lastDrawnFrame) {
-      window.alert('Draw at least one frame before exporting a GIF.');
-      return;
-    }
-
-    setIsExportMenuOpen(false);
     setIsExportingGif(true);
 
     try {
-      const framesToExport = [];
-      for (let frame = 1; frame <= lastDrawnFrame; frame += 1) {
-        framesToExport.push(frameStatesRef.current[frame] || null);
-      }
-
-      const gifBytes = encodeGif({
+      const exportResult = buildGifExport({
         width: CANVAS_SIZE,
         height: CANVAS_SIZE,
-        frames: framesToExport,
+        frames,
+        frameStates: frameStatesRef.current,
+        hasFrameContent,
         fps: playFps,
         loop: loopEnabled,
       });
 
-      const gifBlob = new Blob([gifBytes], { type: 'image/gif' });
-      downloadBlob(gifBlob, getExportFileName());
+      if (!exportResult) {
+        window.alert('Draw at least one frame before exporting a GIF.');
+        return;
+      }
+
+      downloadBlob(exportResult.blob, getGifExportFileName(title));
     } catch (error) {
       console.error('GIF export failed:', error);
       window.alert('GIF export failed. Please try again.');
@@ -188,24 +101,9 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!exportMenuRef.current?.contains(event.target)) {
-        setIsExportMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('pointerdown', handlePointerDown);
-    return () => window.removeEventListener('pointerdown', handlePointerDown);
-  }, []);
-
-  // Handle frame switching - save current frame, load new frame
-  useEffect(() => {
     if (!canvasRef.current) return;
-
-    // Only proceed if we're actually switching frames
     if (previousFrameRef.current === currentFrame) return;
 
-    // Save the frame we're leaving
     const frameToSave = previousFrameRef.current;
     const frameToLoad = currentFrame;
 
@@ -214,11 +112,12 @@ const Home = () => {
         const frameState = canvasRef.current.captureFrameState();
         frameStatesRef.current[frameToSave] = frameState || null;
       }
-      // Save history for this frame
+
       if (canvasRef.current?.historyManager?.getFullState) {
         const historyState = canvasRef.current.historyManager.getFullState();
         frameHistoryRef.current[frameToSave] = historyState;
       }
+
       setThumbnailVersion((prev) => prev + 1);
     };
 
@@ -226,13 +125,12 @@ const Home = () => {
       if (canvasRef.current?.loadFrameState) {
         const frameState = frameStatesRef.current[frameToLoad] || null;
         canvasRef.current.loadFrameState(frameState, getOnionSkinData(frameToLoad), onionSkinEnabled);
-        
-        // Restore history for this frame
+
         if (canvasRef.current?.historyManager?.restoreFullState) {
           const historyState = frameHistoryRef.current[frameToLoad] || null;
           canvasRef.current.historyManager.restoreFullState(historyState);
         }
-        
+
         setHistoryState(canvasRef.current.historyManager.getState());
       }
     };
@@ -242,13 +140,12 @@ const Home = () => {
     previousFrameRef.current = frameToLoad;
   }, [currentFrame]);
 
-  // Re-render current frame when onion skin toggle changes
   useEffect(() => {
     if (!canvasRef.current?.loadFrameState) return;
-    
+
     const frameState = frameStatesRef.current[currentFrame] || null;
     canvasRef.current.loadFrameState(frameState, getOnionSkinData(currentFrame), onionSkinEnabled);
-  }, [onionSkinEnabled]);
+  }, [onionSkinEnabled, currentFrame]);
 
   const handleHistoryStateChange = () => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
@@ -583,85 +480,34 @@ const Home = () => {
           />
         </div>
 
-        <div className="sidebar-block export-menu" ref={exportMenuRef}>
-          <button
-            type="button"
-            className="export-trigger"
-            onClick={() => setIsExportMenuOpen((prev) => !prev)}
-            disabled={isExportingGif}
-          >
-            <span>{isExportingGif ? 'Exporting...' : 'Export'}</span>
-            <span className="toolbar-icon">{isExportMenuOpen ? '-' : '+'}</span>
-          </button>
-          {isExportMenuOpen ? (
-            <div className="export-dropdown">
-              <button
-                type="button"
-                className="export-option"
-                onClick={handleExportGif}
-                disabled={isExportingGif}
-              >
-                GIF Export
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <ExportMenu
+          disabled={isExportingGif}
+          options={[
+            {
+              label: 'GIF Export',
+              onClick: handleExportGif,
+            },
+          ]}
+        />
       </aside>
 
       <main className="main-content">
-        <section className="timeline-bar">
-          <div className="frames-box">
-            <div className="frames-row">
-              {frames.map((frame) => (
-                <button
-                  key={frame}
-                  type="button"
-                  onClick={() => {
-                    setIsPlaying(false);
-                    setCurrentFrame(frame);
-                  }}
-                  className={`frame-thumb ${currentFrame === frame ? 'frame-thumb-active' : ''}`}
-                >
-                  <div className="frame-box">
-                    <FrameThumbnail
-                      imageData={frameStatesRef.current[frame] || null}
-                      version={thumbnailVersion}
-                    />
-                  </div>
-                  <span className="frame-label">{frame}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="playback-controls">
-            <button className="playback-button" type="button" onClick={handleMoveLeft} disabled={currentFrame === 1}>
-              ◀
-            </button>
-            <button className="playback-button" type="button" onClick={handleTogglePlay}>
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
-            <button
-              className="playback-button"
-              type="button"
-              onClick={handleMoveRight}
-              disabled={currentFrame === 30}
-            >
-              ▶
-            </button>
-            <div className="playback-speed">
-              <label htmlFor="fps-slider">FPS: {playFps}</label>
-              <input
-                id="fps-slider"
-                type="range"
-                min="1"
-                max="12"
-                value={playFps}
-                onChange={(e) => setPlayFps(Number(e.target.value))}
-                className="fps-slider"
-              />
-            </div>
-          </div>
-        </section>
+        <FrameTimeline
+          frames={frames}
+          currentFrame={currentFrame}
+          frameStates={frameStatesRef.current}
+          thumbnailVersion={thumbnailVersion}
+          isPlaying={isPlaying}
+          playFps={playFps}
+          onSelectFrame={(frame) => {
+            setIsPlaying(false);
+            setCurrentFrame(frame);
+          }}
+          onMoveLeft={handleMoveLeft}
+          onMoveRight={handleMoveRight}
+          onTogglePlay={handleTogglePlay}
+          onFpsChange={setPlayFps}
+        />
 
         <section className="canvas-area">
           <div className="canvas-header">
