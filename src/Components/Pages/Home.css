@@ -1,6 +1,6 @@
 .home-editor {
   display: flex;
-  min-height: 100vh;
+  min-height: calc(100vh - 80px);
   background: #e8e8e8;
   color: #202020;
 }
@@ -545,6 +545,34 @@
   background: linear-gradient(135deg, #999 0%, #666 100%);
   border: 1px solid #444;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 1100px) {
+  .home-editor {
+    flex-direction: column;
+  }
+
+  .sidebar-panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #c0c0c0;
+  }
+}
+
+@media (max-width: 720px) {
+  .canvas-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .canvas-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .action-button {
+    flex: 1;
+  }
 }
 
 .brush-size-slider::-moz-range-thumb {

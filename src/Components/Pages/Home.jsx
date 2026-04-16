@@ -3,11 +3,13 @@ import Canvas from '../Canvas';
 import ExportMenu from '../ExportMenu';
 import FrameTimeline from '../FrameTimeline';
 import { buildGifExport, downloadBlob, getGifExportFileName } from '../../utils/gifExport';
+import { createBoardPost } from '../../utils/gifBoard';
+import PostToBoardDialog from '../PostToBoardDialog';
 import './Home.css';
 
 const CANVAS_SIZE = 550;
 
-const Home = () => {
+const Home = ({ onPostCreated, onNavigateToBoard }) => {
   const [tool, setTool] = useState('brush');
   const [brushColor, setBrushColor] = useState('#4AA3DF');
   const [brushRadius, setBrushRadius] = useState(8);
@@ -20,11 +22,15 @@ const Home = () => {
   const [description, setDescription] = useState('');
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const [isExportingGif, setIsExportingGif] = useState(false);
+  const [isPostingToBoard, setIsPostingToBoard] = useState(false);
+  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+  const [pendingBoardExport, setPendingBoardExport] = useState(null);
   const [thumbnailVersion, setThumbnailVersion] = useState(0);
   const canvasRef = useRef(null);
   const frameStatesRef = useRef({});
   const frameHistoryRef = useRef({});
   const previousFrameRef = useRef(1);
+  const boardPreviewUrlRef = useRef(null);
   const frames = Array.from({ length: 30 }, (_, index) => index + 1);
 
   const hasFrameContent = (imageData) => {
@@ -63,22 +69,27 @@ const Home = () => {
     setThumbnailVersion((prev) => prev + 1);
   };
 
+  const buildCurrentGifExport = () => {
+    saveCurrentFrameState();
+
+    return buildGifExport({
+      width: CANVAS_SIZE,
+      height: CANVAS_SIZE,
+      frames,
+      frameStates: frameStatesRef.current,
+      hasFrameContent,
+      fps: playFps,
+      loop: loopEnabled,
+    });
+  };
+
   const handleExportGif = async () => {
     if (isExportingGif) return;
 
-    saveCurrentFrameState();
     setIsExportingGif(true);
 
     try {
-      const exportResult = buildGifExport({
-        width: CANVAS_SIZE,
-        height: CANVAS_SIZE,
-        frames,
-        frameStates: frameStatesRef.current,
-        hasFrameContent,
-        fps: playFps,
-        loop: loopEnabled,
-      });
+      const exportResult = buildCurrentGifExport();
 
       if (!exportResult) {
         window.alert('Draw at least one frame before exporting a GIF.');
@@ -93,6 +104,75 @@ const Home = () => {
       setIsExportingGif(false);
     }
   };
+
+  const closePostDialog = () => {
+    setIsPostDialogOpen(false);
+    setPendingBoardExport(null);
+
+    if (boardPreviewUrlRef.current) {
+      URL.revokeObjectURL(boardPreviewUrlRef.current);
+      boardPreviewUrlRef.current = null;
+    }
+  };
+
+  const handleOpenPostDialog = () => {
+    if (isPostingToBoard || isExportingGif) return;
+
+    const exportResult = buildCurrentGifExport();
+    if (!exportResult) {
+      window.alert('Draw at least one frame before posting to the board.');
+      return;
+    }
+
+    if (boardPreviewUrlRef.current) {
+      URL.revokeObjectURL(boardPreviewUrlRef.current);
+    }
+
+    boardPreviewUrlRef.current = URL.createObjectURL(exportResult.blob);
+    setPendingBoardExport({
+      ...exportResult,
+      previewUrl: boardPreviewUrlRef.current,
+    });
+    setIsPostDialogOpen(true);
+  };
+
+  const handleSubmitBoardPost = async ({ postTitle, author, caption }) => {
+    if (!pendingBoardExport || isPostingToBoard) return;
+
+    setIsPostingToBoard(true);
+
+    try {
+      const createdPost = await createBoardPost({
+        gifBlob: pendingBoardExport.blob,
+        title: postTitle,
+        author,
+        caption,
+        width: pendingBoardExport.width,
+        height: pendingBoardExport.height,
+        fps: pendingBoardExport.fps,
+        frameCount: pendingBoardExport.frameCount,
+      });
+
+      closePostDialog();
+      if (onPostCreated) {
+        onPostCreated(createdPost);
+      }
+      if (onNavigateToBoard) {
+        onNavigateToBoard();
+      }
+    } catch (error) {
+      console.error('Board post failed:', error);
+      window.alert(error.message || 'Posting to the board failed. Please try again.');
+    } finally {
+      setIsPostingToBoard(false);
+    }
+  };
+
+  useEffect(() => () => {
+    if (boardPreviewUrlRef.current) {
+      URL.revokeObjectURL(boardPreviewUrlRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
@@ -481,11 +561,15 @@ const Home = () => {
         </div>
 
         <ExportMenu
-          disabled={isExportingGif}
+          disabled={isExportingGif || isPostingToBoard}
           options={[
             {
               label: 'GIF Export',
               onClick: handleExportGif,
+            },
+            {
+              label: 'Post to Board',
+              onClick: handleOpenPostDialog,
             },
           ]}
         />
@@ -538,6 +622,16 @@ const Home = () => {
           </div>
         </section>
       </main>
+      <PostToBoardDialog
+        open={isPostDialogOpen}
+        previewUrl={pendingBoardExport?.previewUrl || ''}
+        exportMeta={pendingBoardExport}
+        initialTitle={title}
+        initialCaption={description}
+        isSubmitting={isPostingToBoard}
+        onClose={closePostDialog}
+        onSubmit={handleSubmitBoardPost}
+      />
     </div>
   );
 };
