@@ -31,12 +31,7 @@ const BoardPage = ({ refreshToken, onNavigateToEditor }) => {
     <main className="board-page">
       <section className="board-page-header">
         <div>
-          <div className="board-page-kicker">DENSE PUBLIC GIF WALL</div>
           <h2 className="board-page-title">GIF Board</h2>
-          <p className="board-page-copy">
-            Fresh flips from the editor land here. Tiles stay tight, metadata stays tiny,
-            and the wall updates from Supabase storage plus the board table.
-          </p>
         </div>
         <div className="board-page-actions">
           <button type="button" className="board-action-button" onClick={loadPosts} disabled={isLoading}>

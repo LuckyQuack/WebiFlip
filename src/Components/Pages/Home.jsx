@@ -517,11 +517,6 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
           />
         </div>
 
-        <div className="sidebar-block layer-row">
-          <button className="layer-button" type="button" />
-          <button className="layer-button" type="button" />
-        </div>
-
         <div className="sidebar-block checkbox-group">
           <label className="checkbox-item">
             <input

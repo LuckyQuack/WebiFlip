@@ -42,7 +42,6 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <div className="app-brand-mark">WEBIFLIP GIF BOARD</div>
           <h1 className="app-title">WebiFlip</h1>
         </div>
         <nav className="app-nav" aria-label="Primary">
