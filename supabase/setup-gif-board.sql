@@ -25,14 +25,24 @@ create policy "Public can read gif board posts"
   on public.gif_board_posts
   for select
   to anon, authenticated
-  using (true);
+  using (status = 'published');
 
 drop policy if exists "Public can insert gif board posts" on public.gif_board_posts;
 create policy "Public can insert gif board posts"
   on public.gif_board_posts
   for insert
   to anon, authenticated
-  with check (true);
+  with check (
+    status = 'published'
+    and char_length(title) between 1 and 80
+    and (author is null or char_length(author) <= 40)
+    and (caption is null or char_length(caption) <= 240)
+    and width between 1 and 550
+    and height between 1 and 550
+    and fps between 1 and 24
+    and frame_count between 1 and 30
+    and gif_url like '%/storage/v1/object/public/gif-board/posts/%'
+  );
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -49,15 +59,12 @@ set
   allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "Public can read gif board assets" on storage.objects;
-create policy "Public can read gif board assets"
-  on storage.objects
-  for select
-  to anon, authenticated
-  using (bucket_id = 'gif-board');
-
 drop policy if exists "Public can upload gif board assets" on storage.objects;
 create policy "Public can upload gif board assets"
   on storage.objects
   for insert
   to anon, authenticated
-  with check (bucket_id = 'gif-board');
+  with check (
+    bucket_id = 'gif-board'
+    and name like 'posts/%'
+  );

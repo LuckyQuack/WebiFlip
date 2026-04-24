@@ -31,7 +31,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
   const frameHistoryRef = useRef({});
   const previousFrameRef = useRef(1);
   const boardPreviewUrlRef = useRef(null);
-  const frames = Array.from({ length: 30 }, (_, index) => index + 1);
+  const frames = React.useMemo(() => Array.from({ length: 30 }, (_, index) => index + 1), []);
 
   const hasFrameContent = (imageData) => {
     if (!imageData) return false;
@@ -42,7 +42,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
     return false;
   };
 
-  const getLastDrawnFrame = () => {
+  const getLastDrawnFrame = React.useCallback(() => {
     let last = 1;
     frames.forEach((frame) => {
       if (hasFrameContent(frameStatesRef.current[frame])) {
@@ -50,16 +50,16 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
       }
     });
     return last;
-  };
+  }, [frames]);
 
-  const getPreviousFrameIndex = (frame) => {
+  const getPreviousFrameIndex = React.useCallback((frame) => {
     return frame > 1 ? frame - 1 : null;
-  };
+  }, []);
 
-  const getOnionSkinData = (frame) => {
+  const getOnionSkinData = React.useCallback((frame) => {
     const prevFrameIndex = getPreviousFrameIndex(frame);
     return prevFrameIndex ? frameStatesRef.current[prevFrameIndex] : null;
-  };
+  }, [getPreviousFrameIndex]);
 
   const saveCurrentFrameState = () => {
     if (!canvasRef.current?.captureFrameState) return;
@@ -218,14 +218,14 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
     saveFrame();
     loadFrame();
     previousFrameRef.current = frameToLoad;
-  }, [currentFrame]);
+  }, [currentFrame, getOnionSkinData, onionSkinEnabled]);
 
   useEffect(() => {
     if (!canvasRef.current?.loadFrameState) return;
 
     const frameState = frameStatesRef.current[currentFrame] || null;
     canvasRef.current.loadFrameState(frameState, getOnionSkinData(currentFrame), onionSkinEnabled);
-  }, [onionSkinEnabled, currentFrame]);
+  }, [onionSkinEnabled, currentFrame, getOnionSkinData]);
 
   const handleHistoryStateChange = () => {
     if (canvasRef.current && canvasRef.current.getHistoryState) {
@@ -295,7 +295,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
     }, 1000 / playFps);
 
     return () => clearInterval(interval);
-  }, [isPlaying, playFps, loopEnabled]);
+  }, [isPlaying, playFps, loopEnabled, getLastDrawnFrame]);
 
   const handleBrushSizeChange = (value) => {
     setBrushRadius(value);

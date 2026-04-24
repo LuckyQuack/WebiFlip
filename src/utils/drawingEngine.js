@@ -35,10 +35,8 @@ export let strokeSmooth = 0.6;
 
 let lastPt = null;
 let stabilizedPt = null;
-let strokeHex = null;
 let isDrawing = false;
 let isPanning = false;
-let _fillEraseAllLayers = false;
 
 export let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
 

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import GifBoardGrid from '../GifBoardGrid';
 import { listBoardPosts } from '../../utils/gifBoard';
+import { downloadBlob, getGifExportFileName } from '../../utils/gifExport';
 
 const BoardPage = ({ refreshToken, onNavigateToEditor }) => {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedPost, setSelectedPost] = useState(null);
+  const [isDownloadingGif, setIsDownloadingGif] = useState(false);
 
   const loadPosts = async () => {
     setIsLoading(true);
@@ -26,6 +28,29 @@ const BoardPage = ({ refreshToken, onNavigateToEditor }) => {
   useEffect(() => {
     loadPosts();
   }, [refreshToken]);
+
+  const handleDownloadSelectedPost = async () => {
+    if (!selectedPost?.gifUrl || isDownloadingGif) {
+      return;
+    }
+
+    setIsDownloadingGif(true);
+
+    try {
+      const response = await fetch(selectedPost.gifUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}.`);
+      }
+
+      const blob = await response.blob();
+      downloadBlob(blob, getGifExportFileName(selectedPost.title || 'webiflip-board-post'));
+    } catch (error) {
+      console.error('GIF download failed:', error);
+      window.alert('Could not download this GIF right now. Please try again.');
+    } finally {
+      setIsDownloadingGif(false);
+    }
+  };
 
   return (
     <main className="board-page">
@@ -89,6 +114,14 @@ const BoardPage = ({ refreshToken, onNavigateToEditor }) => {
               <span>{selectedPost.frameCount} frames</span>
               <span>{selectedPost.fps} fps</span>
               <span>{selectedPost.width}x{selectedPost.height}</span>
+              <button
+                type="button"
+                className="board-detail-download"
+                onClick={handleDownloadSelectedPost}
+                disabled={isDownloadingGif}
+              >
+                {isDownloadingGif ? 'Downloading...' : 'Download GIF'}
+              </button>
             </div>
             {selectedPost.caption ? (
               <p className="board-detail-caption">{selectedPost.caption}</p>

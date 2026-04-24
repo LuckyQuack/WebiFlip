@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { stampLine, drawPressureLine } from '../utils/drawingEngine';
+import { drawPressureLine } from '../utils/drawingEngine';
 import HistoryManager from '../utils/historyManager';
 
 const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, canvasWidth, brushRadius, onHistoryStateChange }, ref) => {
@@ -49,7 +49,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     return contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
   };
 
-  const renderCurrentFrame = (imageData) => {
+  const renderCurrentFrame = React.useCallback((imageData) => {
     const canvas = canvasRef.current;
     const context = contextRef.current;
     if (!canvas || !context) return;
@@ -59,9 +59,9 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
 
     if (!imageData) return;
     context.putImageData(imageData, 0, 0);
-  };
+  }, []);
 
-  const renderOnionSkin = (imageData, enabled) => {
+  const renderOnionSkin = React.useCallback((imageData, enabled) => {
     const canvas = onionSkinCanvasRef.current;
     const context = onionSkinContextRef.current;
     if (!canvas || !context) return;
@@ -77,7 +77,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     if (enabled && hasContent(imageData)) {
       drawImageDataWithAlpha(context, imageData, 0.5);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,7 +98,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
 
     renderCurrentFrame(frameStateRef.current);
     renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
-  }, [canvasWidth, canvasHeight]);
+  }, [canvasWidth, canvasHeight, renderCurrentFrame, renderOnionSkin]);
 
   // Update context properties without resetting the canvas
   useEffect(() => {
@@ -150,7 +150,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     
     try {
       canvasRef.current.setPointerCapture(e.pointerId);
-    } catch (err) {
+    } catch {
       // Ignore if capture fails
     }
 
@@ -230,7 +230,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
 
     try {
       canvasRef.current.releasePointerCapture(e.pointerId);
-    } catch (err) {
+    } catch {
       // Ignore if release fails
     }
   };

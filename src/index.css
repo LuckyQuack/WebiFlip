@@ -341,6 +341,28 @@ a {
   color: #38505d;
 }
 
+.board-detail-download {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #506773;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.board-detail-download:hover:not(:disabled) {
+  color: #20303a;
+  text-decoration: underline;
+}
+
+.board-detail-download:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .board-detail-caption {
   margin: 0;
   padding: 12px 16px 16px;

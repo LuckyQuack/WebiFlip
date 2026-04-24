@@ -1,70 +1,103 @@
-# Getting Started with Create React App
+# WebiFlip
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+WebiFlip is a browser-based GIF sketchpad and public board. It lets people draw frame-by-frame animations, preview playback in the editor, export a GIF locally, and post finished work to a shared board backed by Supabase.
 
-## Available Scripts
+The project is built as a Vite + React single-page app and is deployed on Vercel. The editor and board live in the same app, with hash-based navigation between `#editor` and `#board`.
 
-In the project directory, you can run:
+## What The Site Does
 
-### `npm start`
+- Draw simple frame-by-frame animations on a square canvas
+- Switch between brush and eraser tools
+- Adjust brush size and color
+- Use onion skin and loop playback controls
+- Scrub through frames and preview animation timing
+- Export finished work as a GIF
+- Post exported GIFs to a public board
+- Browse previously posted GIFs from Supabase storage and database records
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Tech Stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- `React`
+- `Vite`
+- `Supabase`
+- `gifenc`
+- `Vercel`
 
-### `npm test`
+## Project Structure
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- [src/App.jsx](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/src/App.jsx) app shell and view switching
+- [src/Components/Pages/Home.jsx](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/src/Components/Pages/Home.jsx) editor experience
+- [src/Components/Pages/BoardPage.jsx](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/src/Components/Pages/BoardPage.jsx) public GIF board
+- [src/utils/gifExport.js](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/src/utils/gifExport.js) GIF generation and download helpers
+- [src/utils/gifBoard.js](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/src/utils/gifBoard.js) Supabase board reads and writes
+- [supabase/setup-gif-board.sql](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/supabase/setup-gif-board.sql) database, bucket, and policy setup
 
-### `npm run build`
+## Local Development
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Install dependencies:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm install
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Start the dev server:
 
-### `npm run eject`
+```bash
+npm run dev
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Create a production build:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+npm run build
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Preview the production build locally:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+npm run preview
+```
 
-## Learn More
+## Environment Variables
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Create a `.env` file in the project root with:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+VITE_SUPABASE_BOARD_TABLE=gif_board_posts
+VITE_SUPABASE_BOARD_BUCKET=gif-board
+```
 
-### Code Splitting
+Only the `VITE_` variables are exposed to the frontend. Do not place a Supabase `service_role` key in this app.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Supabase Setup
 
-### Analyzing the Bundle Size
+This app expects:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- A table for board posts
+- A public storage bucket for GIF uploads
+- RLS and storage policies that allow the app to read and post
 
-### Making a Progressive Web App
+Run the SQL in [supabase/setup-gif-board.sql](/c:/Users/jonat/OneDrive/Desktop/workspace/WebiFlip/supabase/setup-gif-board.sql) inside the Supabase SQL editor before using the board in a fresh project.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Deployment
 
-### Advanced Configuration
+WebiFlip is set up well for Vercel deployment.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Basic deployment flow:
 
-### Deployment
+1. Push the repository to GitHub.
+2. Import the repository into Vercel.
+3. Use the repo root as the project root.
+4. Add the `VITE_SUPABASE_*` environment variables in Vercel.
+5. Make sure the Supabase SQL setup has already been applied.
+6. Deploy and test both the editor and board flows.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Because the app uses hash routing, navigation between the editor and board works without additional SPA rewrite rules.
 
-### `npm run build` fails to minify
+## Notes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- The live posting flow depends on Supabase being configured correctly.
+- GIF posting is intentionally simple and public-facing, so if this grows beyond MVP stage, rate limiting and tighter backend controls are worth adding.
+- The `uidesign` folder contains separate UI exploration work and is not the deployed Vite app at the repo root.
