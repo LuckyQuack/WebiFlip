@@ -9,7 +9,7 @@ import './Home.css';
 
 const CANVAS_SIZE = 550;
 
-const Home = ({ onPostCreated, onNavigateToBoard }) => {
+const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }) => {
   const [tool, setTool] = useState('brush');
   const [brushColor, setBrushColor] = useState('#4AA3DF');
   const [brushRadii, setBrushRadii] = useState({
@@ -309,7 +309,17 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
   };
 
   useEffect(() => {
+    if (!isActive) {
+      setIsPlaying(false);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!isActive) {
+        return;
+      }
+
       const target = e.target;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
@@ -359,7 +369,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMoveLeft, handleMoveRight, handleTogglePlay, isPostDialogOpen]);
+  }, [handleMoveLeft, handleMoveRight, handleTogglePlay, isActive, isPostDialogOpen]);
 
   const hexToRgb = (hex) => {
     let value = hex.replace('#', '');

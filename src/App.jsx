@@ -61,17 +61,19 @@ function App() {
           </button>
         </nav>
       </header>
+      <div hidden={currentView !== 'editor'}>
+        <Home
+          isActive={currentView === 'editor'}
+          onPostCreated={handlePostCreated}
+          onNavigateToBoard={() => navigateTo('board')}
+        />
+      </div>
       {currentView === 'board' ? (
         <BoardPage
           refreshToken={boardRefreshToken}
           onNavigateToEditor={() => navigateTo('editor')}
         />
-      ) : (
-        <Home
-          onPostCreated={handlePostCreated}
-          onNavigateToBoard={() => navigateTo('board')}
-        />
-      )}
+      ) : null}
     </div>
   );
 }
