@@ -14,6 +14,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const cursorDotRef = useRef(null);
   const historyManagerRef = useRef(new HistoryManager());
   const frameStateRef = useRef(null);
+  const onHistoryStateChangeRef = useRef(onHistoryStateChange);
   const onionSkinStateRef = useRef({
     enabled: false,
     imageData: null,
@@ -79,6 +80,10 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   }, []);
 
   useEffect(() => {
+    onHistoryStateChangeRef.current = onHistoryStateChange;
+  }, [onHistoryStateChange]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     const onionCanvas = onionSkinCanvasRef.current;
     if (!canvas || !onionCanvas) return;
@@ -99,6 +104,16 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
   }, [canvasWidth, canvasHeight, renderCurrentFrame, renderOnionSkin]);
 
+  const finishActiveStroke = React.useCallback(() => {
+    const didCommit = historyManagerRef.current.commitAction(canvasRef.current);
+
+    if (didCommit && canvasRef.current) {
+      const frameState = captureCurrentFrameState();
+      frameStateRef.current = frameState;
+      onHistoryStateChangeRef.current?.();
+    }
+  }, []);
+
   const resetActiveStroke = React.useCallback(() => {
     activePointersRef.current.forEach((pointerId) => {
       try {
@@ -112,9 +127,9 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     pointerDataRef.current.clear();
     pressedPointersRef.current.clear();
     isDrawingRef.current = false;
-    historyManagerRef.current.cancelAction();
+    finishActiveStroke();
     hideCursorDot();
-  }, []);
+  }, [finishActiveStroke]);
 
   // Update context properties without resetting the canvas
   useEffect(() => {

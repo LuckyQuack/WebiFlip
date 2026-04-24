@@ -46,12 +46,14 @@ class HistoryManager {
   commitAction(canvas) {
     if (!this.pendingAction || !this.isDirty) {
       this.pendingAction = null;
-      return;
+      this.isDirty = false;
+      return false;
     }
 
     if (!canvas) {
       this.pendingAction = null;
-      return;
+      this.isDirty = false;
+      return false;
     }
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -73,6 +75,7 @@ class HistoryManager {
     this.redoStack = [];
     this.pendingAction = null;
     this.isDirty = false;
+    return true;
   }
 
   /**
@@ -87,12 +90,16 @@ class HistoryManager {
    * Undo the last action
    */
   undo(canvas) {
-    if (this.undoStack.length === 0 || !canvas) return false;
+    if (!canvas) return false;
 
-    // If there's a pending action, finalize it first
+    // If there's a pending action, finalize it before checking availability.
+    // Fast pen/tool/undo input can otherwise leave the latest stroke visible
+    // on the canvas but absent from the undo stack.
     if (this.pendingAction) {
       this.commitAction(canvas);
     }
+
+    if (this.undoStack.length === 0) return false;
 
     const action = this.undoStack.pop();
     this.redoStack.push(action);
@@ -106,7 +113,13 @@ class HistoryManager {
    * Redo the last undone action
    */
   redo(canvas) {
-    if (this.redoStack.length === 0 || !canvas) return false;
+    if (!canvas) return false;
+
+    if (this.pendingAction) {
+      this.commitAction(canvas);
+    }
+
+    if (this.redoStack.length === 0) return false;
 
     const action = this.redoStack.pop();
     this.undoStack.push(action);
