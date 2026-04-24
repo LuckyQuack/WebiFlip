@@ -12,7 +12,10 @@ const CANVAS_SIZE = 550;
 const Home = ({ onPostCreated, onNavigateToBoard }) => {
   const [tool, setTool] = useState('brush');
   const [brushColor, setBrushColor] = useState('#4AA3DF');
-  const [brushRadius, setBrushRadius] = useState(8);
+  const [brushRadii, setBrushRadii] = useState({
+    brush: 8,
+    eraser: 24,
+  });
   const [currentFrame, setCurrentFrame] = useState(1);
   const [onionSkinEnabled, setOnionSkinEnabled] = useState(true);
   const [loopEnabled, setLoopEnabled] = useState(true);
@@ -32,6 +35,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
   const previousFrameRef = useRef(1);
   const boardPreviewUrlRef = useRef(null);
   const frames = React.useMemo(() => Array.from({ length: 30 }, (_, index) => index + 1), []);
+  const brushRadius = brushRadii[tool] ?? brushRadii.brush;
 
   const hasFrameContent = (imageData) => {
     if (!imageData) return false;
@@ -254,7 +258,7 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
     }
   };
 
-  const handleTogglePlay = () => {
+  const handleTogglePlay = React.useCallback(() => {
     const lastFrame = getLastDrawnFrame();
     if (isPlaying) {
       setIsPlaying(false);
@@ -265,17 +269,17 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
     if (lastFrame > 1) {
       setIsPlaying(true);
     }
-  };
+  }, [getLastDrawnFrame, isPlaying]);
 
-  const handleMoveLeft = () => {
+  const handleMoveLeft = React.useCallback(() => {
     setIsPlaying(false);
     setCurrentFrame((prev) => Math.max(1, prev - 1));
-  };
+  }, []);
 
-  const handleMoveRight = () => {
+  const handleMoveRight = React.useCallback(() => {
     setIsPlaying(false);
     setCurrentFrame((prev) => Math.min(30, prev + 1));
-  };
+  }, []);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -298,7 +302,10 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
   }, [isPlaying, playFps, loopEnabled, getLastDrawnFrame]);
 
   const handleBrushSizeChange = (value) => {
-    setBrushRadius(value);
+    setBrushRadii((prev) => ({
+      ...prev,
+      [tool]: value,
+    }));
   };
 
   useEffect(() => {
@@ -308,10 +315,21 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
         return;
       }
 
+      if (isPostDialogOpen) {
+        return;
+      }
+
       const key = e.key.toLowerCase();
       const isUndo = (e.ctrlKey || e.metaKey) && key === 'z';
       const isRedo = (e.ctrlKey || e.metaKey) && key === 'y';
-      if (!isUndo && !isRedo) {
+      const isToolShortcut = !e.ctrlKey && !e.metaKey && !e.altKey && (key === 'p' || key === 'e');
+      const isPlaybackShortcut = !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space';
+      const isFrameShortcut = !e.ctrlKey && !e.metaKey && !e.altKey && (
+        e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+      );
+      const isOnionSkinShortcut = !e.ctrlKey && !e.metaKey && !e.altKey && key === 'o';
+
+      if (!isUndo && !isRedo && !isToolShortcut && !isPlaybackShortcut && !isFrameShortcut && !isOnionSkinShortcut) {
         return;
       }
 
@@ -324,12 +342,24 @@ const Home = ({ onPostCreated, onNavigateToBoard }) => {
         if (canvasRef.current) {
           canvasRef.current.redo();
         }
+      } else if (isToolShortcut) {
+        setTool(key === 'p' ? 'brush' : 'eraser');
+      } else if (isPlaybackShortcut && !e.repeat) {
+        handleTogglePlay();
+      } else if (isFrameShortcut) {
+        if (e.key === 'ArrowLeft') {
+          handleMoveLeft();
+        } else {
+          handleMoveRight();
+        }
+      } else if (isOnionSkinShortcut && !e.repeat) {
+        setOnionSkinEnabled((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleMoveLeft, handleMoveRight, handleTogglePlay, isPostDialogOpen]);
 
   const hexToRgb = (hex) => {
     let value = hex.replace('#', '');

@@ -408,6 +408,15 @@
   gap: 0;
 }
 
+.frame-thumb:focus {
+  outline: none;
+}
+
+.frame-thumb:focus-visible .frame-box {
+  border-color: #2d7fb4;
+  box-shadow: 0 0 0 2px rgba(74, 163, 223, 0.35);
+}
+
 .frame-box {
   width: 56px;
   height: 40px;

@@ -8,8 +8,6 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const contextRef = useRef(null);
   const onionSkinContextRef = useRef(null);
   const isDrawingRef = useRef(false);
-  const lastPosRef = useRef(null);
-  const lastPressureRef = useRef(1);
   const activePointersRef = useRef(new Set());
   const pointerDataRef = useRef(new Map());
   const cursorDotRef = useRef(null);
@@ -89,8 +87,8 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     onionCanvas.width = canvasWidth;
     onionCanvas.height = canvasHeight;
 
-    const context = canvas.getContext('2d');
-    const onionSkinContext = onionCanvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const onionSkinContext = onionCanvas.getContext('2d', { willReadFrequently: true });
     context.lineCap = 'round';
     context.lineJoin = 'round';
     contextRef.current = context;
@@ -100,15 +98,32 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
   }, [canvasWidth, canvasHeight, renderCurrentFrame, renderOnionSkin]);
 
+  const resetActiveStroke = React.useCallback(() => {
+    activePointersRef.current.forEach((pointerId) => {
+      try {
+        canvasRef.current?.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture may already be gone after tablet driver cancellation.
+      }
+    });
+
+    activePointersRef.current.clear();
+    pointerDataRef.current.clear();
+    isDrawingRef.current = false;
+    historyManagerRef.current.cancelAction();
+    hideCursorDot();
+  }, []);
+
   // Update context properties without resetting the canvas
   useEffect(() => {
     const context = contextRef.current;
     if (!context) return;
 
+    resetActiveStroke();
     context.lineWidth = brushRadius;
     context.strokeStyle = brushColor;
     context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-  }, [brushRadius, brushColor, tool]);
+  }, [brushRadius, brushColor, resetActiveStroke, tool]);
 
   const getCanvasPos = (clientX, clientY) => {
     const canvas = canvasRef.current;
@@ -132,7 +147,33 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     }
   };
 
+  const getPointerPressure = (e) => {
+    if (typeof e.pressure === 'number' && e.pressure > 0) {
+      return e.pressure;
+    }
+
+    return e.pointerType === 'pen' ? 0.35 : 1;
+  };
+
+  const drawStrokeSegment = (fromX, fromY, toX, toY, fromPressure, toPressure) => {
+    const drawColor = tool === 'eraser' ? '#000000' : brushColor;
+    drawPressureLine(
+      contextRef.current,
+      fromX,
+      fromY,
+      toX,
+      toY,
+      brushRadius,
+      fromPressure,
+      toPressure,
+      drawColor,
+      1
+    );
+  };
+
   const startDrawing = (e) => {
+    e.preventDefault();
+
     if (e.pointerType === 'touch' && activePointersRef.current.size > 0) {
       return;
     }
@@ -145,7 +186,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     activePointersRef.current.add(e.pointerId);
     const { x, y } = getCanvasPos(e.clientX, e.clientY);
     
-    const pointerPressure = e.pressure || 1;
+    const pointerPressure = getPointerPressure(e);
     pointerDataRef.current.set(e.pointerId, { lastX: x, lastY: y, pressure: pointerPressure });
     
     try {
@@ -157,13 +198,16 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     contextRef.current.beginPath();
     contextRef.current.moveTo(x, y);
     isDrawingRef.current = true;
-    lastPosRef.current = { x, y };
-    lastPressureRef.current = pointerPressure;
+
+    ref.current?.historyManager.markDirty();
+    drawStrokeSegment(x, y, x, y, pointerPressure, pointerPressure);
     
     updateCursorDot(e.clientX, e.clientY);
   };
 
   const draw = (e) => {
+    e.preventDefault();
+
     // Update cursor dot for both drawing and hovering
     updateCursorDot(e.clientX, e.clientY);
 
@@ -173,45 +217,35 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     ref.current?.historyManager.markDirty();
 
     const { x, y } = getCanvasPos(e.clientX, e.clientY);
-    const currentPressure = e.pressure || 1;
+    const currentPressure = getPointerPressure(e);
 
     const pointerData = pointerDataRef.current.get(e.pointerId);
     if (!pointerData) return;
 
     const lastPressure = pointerData.pressure;
+    const lastX = pointerData.lastX;
+    const lastY = pointerData.lastY;
     pointerData.pressure = currentPressure;
     pointerData.lastX = x;
     pointerData.lastY = y;
 
-    if (lastPosRef.current) {
-      const drawColor = tool === 'eraser' ? '#000000' : brushColor;
-      drawPressureLine(
-        contextRef.current,
-        lastPosRef.current.x,
-        lastPosRef.current.y,
-        x,
-        y,
-        brushRadius,
-        lastPressure,
-        currentPressure,
-        drawColor,
-        1
-      );
-    }
-
-    lastPosRef.current = { x, y };
-    lastPressureRef.current = currentPressure;
+    drawStrokeSegment(lastX, lastY, x, y, lastPressure, currentPressure);
   };
 
   const stopDrawing = (e) => {
+    e.preventDefault();
+
+    if (!activePointersRef.current.has(e.pointerId)) {
+      hideCursorDot();
+      return;
+    }
+
     activePointersRef.current.delete(e.pointerId);
     pointerDataRef.current.delete(e.pointerId);
 
     if (activePointersRef.current.size === 0) {
       contextRef.current.closePath();
       isDrawingRef.current = false;
-      lastPosRef.current = null;
-      lastPressureRef.current = 1;
       
       // Commit history action phase (capture "after" snapshot)
       ref.current?.historyManager.commitAction(canvasRef.current);
@@ -237,7 +271,10 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
 
   const handlePointerLeave = (e) => {
     hideCursorDot();
-    stopDrawing(e);
+
+    if (activePointersRef.current.has(e.pointerId)) {
+      stopDrawing(e);
+    }
   };
 
   React.useImperativeHandle(ref, () => ({
@@ -308,6 +345,8 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
         onPointerUp={stopDrawing}
         onPointerLeave={handlePointerLeave}
         onPointerCancel={stopDrawing}
+        onLostPointerCapture={stopDrawing}
+        onContextMenu={(e) => e.preventDefault()}
         style={{
           position: 'relative',
           border: '1px solid #ccc',
