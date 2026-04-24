@@ -10,6 +10,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
   const isDrawingRef = useRef(false);
   const activePointersRef = useRef(new Set());
   const pointerDataRef = useRef(new Map());
+  const pressedPointersRef = useRef(new Map());
   const cursorDotRef = useRef(null);
   const historyManagerRef = useRef(new HistoryManager());
   const frameStateRef = useRef(null);
@@ -109,6 +110,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
 
     activePointersRef.current.clear();
     pointerDataRef.current.clear();
+    pressedPointersRef.current.clear();
     isDrawingRef.current = false;
     historyManagerRef.current.cancelAction();
     hideCursorDot();
@@ -134,6 +136,19 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     };
   };
 
+  const isPointInsideCanvas = (clientX, clientY) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+
+    const rect = canvas.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  };
+
   const updateCursorDot = (clientX, clientY) => {
     if (!cursorDotRef.current) return;
     cursorDotRef.current.style.left = `${clientX}px`;
@@ -155,6 +170,26 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     return e.pointerType === 'pen' ? 0.35 : 1;
   };
 
+  const isPrimaryPointerButtonDown = (e) => {
+    if (e.pointerType === 'pen') {
+      return e.buttons !== 0 || e.pressure > 0;
+    }
+
+    if (e.pointerType === 'touch') {
+      return e.buttons === 0 || (e.buttons & 1) === 1;
+    }
+
+    return (e.buttons & 1) === 1;
+  };
+
+  const shouldKeepTrackingPointer = (e, pressedPointer) => {
+    if (e.pointerType === 'pen' || e.pointerType === 'touch') {
+      return !!pressedPointer;
+    }
+
+    return isPrimaryPointerButtonDown(e);
+  };
+
   const drawStrokeSegment = (fromX, fromY, toX, toY, fromPressure, toPressure) => {
     const drawColor = tool === 'eraser' ? '#000000' : brushColor;
     drawPressureLine(
@@ -171,7 +206,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     );
   };
 
-  const startDrawing = (e) => {
+  const startDrawing = (e, initialPoint = null) => {
     e.preventDefault();
 
     if (e.pointerType === 'touch' && activePointersRef.current.size > 0) {
@@ -184,7 +219,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     }
 
     activePointersRef.current.add(e.pointerId);
-    const { x, y } = getCanvasPos(e.clientX, e.clientY);
+    const { x, y } = initialPoint ?? getCanvasPos(e.clientX, e.clientY);
     
     const pointerPressure = getPointerPressure(e);
     pointerDataRef.current.set(e.pointerId, { lastX: x, lastY: y, pressure: pointerPressure });
@@ -211,7 +246,20 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     // Update cursor dot for both drawing and hovering
     updateCursorDot(e.clientX, e.clientY);
 
-    if (!isDrawingRef.current || !activePointersRef.current.has(e.pointerId)) return;
+    if (!isDrawingRef.current || !activePointersRef.current.has(e.pointerId)) {
+      if (isPrimaryPointerButtonDown(e)) {
+        const pressedPointer = pressedPointersRef.current.get(e.pointerId);
+        const previousPoint = pressedPointer
+          ? getCanvasPos(pressedPointer.previousClientX, pressedPointer.previousClientY)
+          : getCanvasPos(
+              e.clientX - (e.movementX || 0),
+              e.clientY - (e.movementY || 0)
+            );
+        startDrawing(e, previousPoint);
+      }
+
+      if (!isDrawingRef.current || !activePointersRef.current.has(e.pointerId)) return;
+    }
 
     // Mark history action as dirty (something changed)
     ref.current?.historyManager.markDirty();
@@ -269,12 +317,90 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
     }
   };
 
+  useEffect(() => {
+    const trackPointerDown = (e) => {
+      if (e.pointerType === 'mouse' && !isPrimaryPointerButtonDown(e)) return;
+
+      pressedPointersRef.current.set(e.pointerId, {
+        lastClientX: e.clientX,
+        lastClientY: e.clientY,
+        previousClientX: e.clientX,
+        previousClientY: e.clientY,
+      });
+    };
+
+    const trackPointerMove = (e) => {
+      let pressedPointer = pressedPointersRef.current.get(e.pointerId);
+
+      if (!shouldKeepTrackingPointer(e, pressedPointer)) {
+        pressedPointersRef.current.delete(e.pointerId);
+        return;
+      }
+
+      e.preventDefault();
+
+      if (!pressedPointer) {
+        trackPointerDown(e);
+        pressedPointer = pressedPointersRef.current.get(e.pointerId);
+      }
+
+      const currentPointIsInside = isPointInsideCanvas(e.clientX, e.clientY);
+
+      if (currentPointIsInside) {
+        updateCursorDot(e.clientX, e.clientY);
+
+        if (!activePointersRef.current.has(e.pointerId)) {
+          startDrawing(e, getCanvasPos(pressedPointer.lastClientX, pressedPointer.lastClientY));
+        }
+
+        draw(e);
+      }
+
+      pressedPointer.previousClientX = pressedPointer.lastClientX;
+      pressedPointer.previousClientY = pressedPointer.lastClientY;
+      pressedPointer.lastClientX = e.clientX;
+      pressedPointer.lastClientY = e.clientY;
+    };
+
+    const clearPointer = (e) => {
+      pressedPointersRef.current.delete(e.pointerId);
+      stopDrawing(e);
+    };
+
+    const listenerOptions = { capture: true, passive: false };
+
+    window.addEventListener('pointerdown', trackPointerDown, listenerOptions);
+    window.addEventListener('pointermove', trackPointerMove, listenerOptions);
+    window.addEventListener('pointerrawupdate', trackPointerMove, listenerOptions);
+    window.addEventListener('pointerup', clearPointer, listenerOptions);
+    window.addEventListener('pointercancel', clearPointer, listenerOptions);
+
+    return () => {
+      window.removeEventListener('pointerdown', trackPointerDown, listenerOptions);
+      window.removeEventListener('pointermove', trackPointerMove, listenerOptions);
+      window.removeEventListener('pointerrawupdate', trackPointerMove, listenerOptions);
+      window.removeEventListener('pointerup', clearPointer, listenerOptions);
+      window.removeEventListener('pointercancel', clearPointer, listenerOptions);
+    };
+  });
+
   const handlePointerLeave = (e) => {
     hideCursorDot();
 
     if (activePointersRef.current.has(e.pointerId)) {
       stopDrawing(e);
     }
+  };
+
+  const handlePointerEnter = (e) => {
+    updateCursorDot(e.clientX, e.clientY);
+
+    if (isDrawingRef.current || activePointersRef.current.has(e.pointerId)) return;
+    if (!isPrimaryPointerButtonDown(e) || !pressedPointersRef.current.has(e.pointerId)) return;
+
+    const pressedPointer = pressedPointersRef.current.get(e.pointerId);
+    startDrawing(e, getCanvasPos(pressedPointer.previousClientX, pressedPointer.previousClientY));
+    draw(e);
   };
 
   React.useImperativeHandle(ref, () => ({
@@ -341,6 +467,7 @@ const Canvas = React.forwardRef(({ tool = 'brush', brushColor, canvasHeight, can
       <canvas
         ref={canvasRef}
         onPointerDown={startDrawing}
+        onPointerEnter={handlePointerEnter}
         onPointerMove={draw}
         onPointerUp={stopDrawing}
         onPointerLeave={handlePointerLeave}
