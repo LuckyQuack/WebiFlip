@@ -77,6 +77,12 @@ export const useBoardPost = ({
       return;
     }
 
+    const MAX_GIF_BYTES = 5 * 1024 * 1024;
+    if (pendingBoardExport.blob.size > MAX_GIF_BYTES) {
+      setSubmitError('GIF is too large (max 5 MB). Try fewer frames or a lower FPS.');
+      return;
+    }
+
     setIsPostingToBoard(true);
     setSubmitError('');
 

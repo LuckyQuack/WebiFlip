@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { PendingBoardExport } from '../types';
 
 interface PostToBoardDialogProps {
@@ -46,7 +46,7 @@ const PostToBoardDialog = ({
 
   if (!open) return null;
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     await onSubmit({ postTitle, author, caption });
   };

@@ -31,7 +31,12 @@ const ExportMenu = ({ disabled = false, options = [] }: ExportMenuProps) => {
 
   const handleOptionClick = async (action: () => void | Promise<void>) => {
     setIsOpen(false);
-    await action();
+    try {
+      await action();
+    } catch (error) {
+      console.error('Export action failed:', error);
+      window.alert('The export failed. Please try again.');
+    }
   };
 
   return (

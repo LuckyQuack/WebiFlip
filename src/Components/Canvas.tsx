@@ -54,6 +54,10 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
     const onHistoryStateChangeRef = useRef(onHistoryStateChange);
     const onionSkinStateRef = useRef({ enabled: false, imageData: null as ImageData | null });
     const offscreenCanvasRef = useRef(document.createElement('canvas'));
+    // Refs for props used inside the stable window-event useEffect ([])
+    const brushColorRef = useRef(brushColor);
+    const toolRef = useRef(tool);
+    const brushRadiusRef = useRef(brushRadius);
 
     const drawImageDataWithAlpha = (context: CanvasRenderingContext2D, imageData: ImageData, alpha: number) => {
       const offscreen = offscreenCanvasRef.current;
@@ -101,9 +105,10 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       }
     }, []);
 
-    useEffect(() => {
-      onHistoryStateChangeRef.current = onHistoryStateChange;
-    }, [onHistoryStateChange]);
+    useEffect(() => { onHistoryStateChangeRef.current = onHistoryStateChange; }, [onHistoryStateChange]);
+    useEffect(() => { brushColorRef.current = brushColor; }, [brushColor]);
+    useEffect(() => { toolRef.current = tool; }, [tool]);
+    useEffect(() => { brushRadiusRef.current = brushRadius; }, [brushRadius]);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -195,8 +200,8 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
     };
 
     const drawStrokeSegment = (fromX: number, fromY: number, toX: number, toY: number, fromPressure: number, toPressure: number) => {
-      const drawColor = tool === 'eraser' ? '#000000' : brushColor;
-      drawPressureLine(contextRef.current!, fromX, fromY, toX, toY, brushRadius, fromPressure, toPressure, drawColor, 1);
+      const drawColor = toolRef.current === 'eraser' ? '#000000' : brushColorRef.current;
+      drawPressureLine(contextRef.current!, fromX, fromY, toX, toY, brushRadiusRef.current, fromPressure, toPressure, drawColor, 1);
     };
 
     // Using a ref for the imperative handle so we can reference it in startDrawing/stopDrawing
@@ -352,7 +357,9 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
         window.removeEventListener('pointerup', clearPointer, opts);
         window.removeEventListener('pointercancel', clearPointer, opts);
       };
-    });
+    // Intentionally [] — all mutable values are accessed through stable refs above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handlePointerLeave = (e: React.PointerEvent) => {
       hideCursorDot();

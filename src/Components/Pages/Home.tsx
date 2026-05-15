@@ -71,6 +71,12 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
     });
   }, [saveCurrentFrameState, frameStatesRef, playFps, loopEnabled]);
 
+  const handlePostCreated = useCallback((post: BoardPost) => {
+    setTitle('');
+    setDescription('');
+    onPostCreated?.(post);
+  }, [onPostCreated]);
+
   const {
     isPostingToBoard,
     isPostDialogOpen,
@@ -79,7 +85,7 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
     handleOpenPostDialog,
     handleSubmitBoardPost,
     closePostDialog,
-  } = useBoardPost({ buildGifExport: buildCurrentGifExport, onPostCreated, onNavigateToBoard });
+  } = useBoardPost({ buildGifExport: buildCurrentGifExport, onPostCreated: handlePostCreated, onNavigateToBoard });
 
   const handleExportGif = useCallback(async () => {
     if (isExportingGif) return;

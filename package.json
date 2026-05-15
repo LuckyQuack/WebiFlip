@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -17,6 +19,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
@@ -24,6 +29,8 @@
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
-    "vite": "^4.4.5"
+    "jsdom": "^29.1.1",
+    "vite": "^4.4.5",
+    "vitest": "^4.1.6"
   }
 }
