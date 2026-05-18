@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { captureError, trackEvent } from '../utils/monitoring';
 
 interface ExportOption {
   label: string;
@@ -29,12 +30,13 @@ const ExportMenu = ({ disabled = false, options = [] }: ExportMenuProps) => {
     if (disabled) setIsOpen(false);
   }, [disabled]);
 
-  const handleOptionClick = async (action: () => void | Promise<void>) => {
+  const handleOptionClick = async (option: ExportOption) => {
     setIsOpen(false);
+    trackEvent('export.action', { label: option.label });
     try {
-      await action();
+      await option.onClick();
     } catch (error) {
-      console.error('Export action failed:', error);
+      captureError(error, { context: 'ExportMenu', label: option.label });
       window.alert('The export failed. Please try again.');
     }
   };
@@ -57,7 +59,7 @@ const ExportMenu = ({ disabled = false, options = [] }: ExportMenuProps) => {
               key={option.label}
               type="button"
               className="export-option"
-              onClick={() => handleOptionClick(option.onClick)}
+              onClick={() => handleOptionClick(option)}
               disabled={disabled || option.disabled}
             >
               {option.label}

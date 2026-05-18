@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { captureError } from '../utils/monitoring';
 
 interface Props {
   children: ReactNode;
@@ -16,7 +17,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Uncaught error:', error, info.componentStack);
+    captureError(error, { componentStack: info.componentStack ?? undefined });
   }
 
   render() {

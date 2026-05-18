@@ -9,6 +9,7 @@ import { usePlayback } from '../../hooks/usePlayback';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useBoardPost } from '../../hooks/useBoardPost';
 import { buildGifExport, downloadBlob, getGifExportFileName, hasFrameContent } from '../../utils/gifExport';
+import { captureError, trackEvent } from '../../utils/monitoring';
 import type { BoardPost, DrawingTool, HistoryState } from '../../types';
 import type { CanvasHandle } from '../Canvas';
 import './Home.css';
@@ -96,8 +97,14 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
         window.alert('Draw at least one frame before exporting a GIF.');
         return;
       }
+      trackEvent('gif.exported', {
+        frameCount: result.frameCount,
+        fps: result.fps,
+        fileSizeKb: Math.round(result.blob.size / 1024),
+      });
       downloadBlob(result.blob, getGifExportFileName(title));
-    } catch {
+    } catch (err) {
+      captureError(err, { context: 'handleExportGif' });
       window.alert('GIF export failed. Please try again.');
     } finally {
       setIsExportingGif(false);

@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.103.2",
     "gifenc": "^1.0.3",
     "react": "^18.3.1",

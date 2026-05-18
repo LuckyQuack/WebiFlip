@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createBoardPost } from '../utils/gifBoard';
+import { captureError, trackEvent } from '../utils/monitoring';
 import type { BoardPost, GifExportResult, PendingBoardExport } from '../types';
 
 const RATE_LIMIT_MS = 60_000;
@@ -99,10 +100,16 @@ export const useBoardPost = ({
       });
 
       lastPostTimeRef.current = Date.now();
+      trackEvent('board.post.submitted', {
+        frameCount: pendingBoardExport.frameCount,
+        fps: pendingBoardExport.fps,
+        fileSizeKb: Math.round(pendingBoardExport.blob.size / 1024),
+      });
       closePostDialog();
       onPostCreated?.(createdPost);
       onNavigateToBoard?.();
     } catch (error) {
+      captureError(error, { context: 'useBoardPost.handleSubmitBoardPost' });
       const message = error instanceof Error ? error.message : 'Posting to the board failed. Please try again.';
       setSubmitError(message);
     } finally {
