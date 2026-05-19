@@ -93,11 +93,3 @@ Basic deployment flow:
 4. Add the `VITE_SUPABASE_*` environment variables in Vercel.
 5. Make sure the Supabase SQL setup has already been applied.
 6. Deploy and test both the editor and board flows.
-
-Because the app uses hash routing, navigation between the editor and board works without additional SPA rewrite rules.
-
-## Notes
-
-- The live posting flow depends on Supabase being configured correctly.
-- GIF posting is intentionally simple and public-facing, so if this grows beyond MVP stage, rate limiting and tighter backend controls are worth adding.
-- The `uidesign` folder contains separate UI exploration work and is not the deployed Vite app at the repo root.
