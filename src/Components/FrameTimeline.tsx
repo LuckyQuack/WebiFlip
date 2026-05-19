@@ -62,7 +62,7 @@ const FrameTimeline = ({
             id="fps-slider"
             type="range"
             min="1"
-            max="12"
+            max="24"
             value={playFps}
             onChange={(e) => onFpsChange(Number(e.target.value))}
             className="fps-slider"

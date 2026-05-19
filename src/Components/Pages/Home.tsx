@@ -235,7 +235,11 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
               <button
                 className="action-button"
                 type="button"
-                onClick={() => copyCurrentFrameToNext(FRAME_COUNT)}
+                onClick={() => {
+                  if (copyCurrentFrameToNext(FRAME_COUNT)) {
+                    setCurrentFrame(currentFrame + 1);
+                  }
+                }}
                 disabled={isPlaying || currentFrame >= FRAME_COUNT}
                 title={currentFrame >= FRAME_COUNT ? 'No next frame' : 'Copy this frame to the next frame'}
               >
