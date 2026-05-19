@@ -4,7 +4,7 @@ const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 const isDev = import.meta.env.DEV;
 
 export function initMonitoring(): void {
-  if (!DSN) return;
+  if (!DSN || isDev) return;
 
   Sentry.init({
     dsn: DSN,
