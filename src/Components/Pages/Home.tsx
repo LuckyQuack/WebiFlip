@@ -52,7 +52,7 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
 
   const handleHistoryStateChange = useCallback((state: HistoryState) => setHistoryState(state), []);
 
-  const { thumbnailVersion, saveCurrentFrameState } = useFrameManager({
+  const { thumbnailVersion, saveCurrentFrameState, copyCurrentFrameToNext } = useFrameManager({
     frameStatesRef,
     currentFrame,
     onionSkinEnabled,
@@ -232,6 +232,15 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
                 canvasRef.current?.clear();
                 frameStatesRef.current[currentFrame] = null;
               }}>Clear</button>
+              <button
+                className="action-button"
+                type="button"
+                onClick={() => copyCurrentFrameToNext(FRAME_COUNT)}
+                disabled={isPlaying || currentFrame >= FRAME_COUNT}
+                title={currentFrame >= FRAME_COUNT ? 'No next frame' : 'Copy this frame to the next frame'}
+              >
+                Copy to Next
+              </button>
             </div>
           </div>
           <div className="canvas-frame">

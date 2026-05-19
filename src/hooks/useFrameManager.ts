@@ -15,6 +15,7 @@ interface UseFrameManagerReturn {
   thumbnailVersion: number;
   saveCurrentFrameState: () => void;
   getOnionSkinData: (frame: number) => ImageData | null;
+  copyCurrentFrameToNext: (totalFrames: number) => boolean;
 }
 
 export const useFrameManager = ({
@@ -84,5 +85,25 @@ export const useFrameManager = ({
     );
   }, [onionSkinEnabled, currentFrame, getOnionSkinData, canvasRef, frameStatesRef]);
 
-  return { thumbnailVersion, saveCurrentFrameState, getOnionSkinData };
+  const copyCurrentFrameToNext = useCallback((totalFrames: number): boolean => {
+    if (currentFrame >= totalFrames) return false;
+
+    // Save current canvas state before copying so the source data is fresh
+    if (canvasRef.current?.captureFrameState) {
+      frameStatesRef.current[currentFrame] = canvasRef.current.captureFrameState() ?? null;
+    }
+
+    const source = frameStatesRef.current[currentFrame];
+    frameStatesRef.current[currentFrame + 1] = source
+      ? new ImageData(new Uint8ClampedArray(source.data), source.width, source.height)
+      : null;
+
+    // Clear stale undo history for the overwritten frame
+    delete frameHistoryRef.current[currentFrame + 1];
+
+    setThumbnailVersion((v) => v + 1);
+    return true;
+  }, [currentFrame, canvasRef, frameStatesRef]);
+
+  return { thumbnailVersion, saveCurrentFrameState, getOnionSkinData, copyCurrentFrameToNext };
 };
