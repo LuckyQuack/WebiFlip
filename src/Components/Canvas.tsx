@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { drawPressureLine } from '../utils/drawingEngine';
+import {
+  drawPressureLine,
+  resetPenVelocity, trackPenVelocity, penRadius,
+  drawPenDot, drawPenBezier, drawPenLine,
+  type PenPoint,
+} from '../utils/drawingEngine';
 import { HistoryManager } from '../utils/historyManager';
 import type { DrawingTool, HistoryState } from '../types';
 
@@ -58,6 +63,8 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
     const brushColorRef = useRef(brushColor);
     const toolRef = useRef(tool);
     const brushRadiusRef = useRef(brushRadius);
+    const penBuffersRef = useRef(new Map<number, PenPoint[]>());
+    const penStrokeCountRef = useRef(new Map<number, number>());
 
     const drawImageDataWithAlpha = (context: CanvasRenderingContext2D, imageData: ImageData, alpha: number) => {
       const offscreen = offscreenCanvasRef.current;
@@ -150,6 +157,8 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       activePointersRef.current.clear();
       pointerDataRef.current.clear();
       pressedPointersRef.current.clear();
+      penBuffersRef.current.clear();
+      penStrokeCountRef.current.clear();
       isDrawingRef.current = false;
       finishActiveStroke();
       hideCursorDot();
@@ -227,7 +236,19 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       isDrawingRef.current = true;
 
       imperativeRef?.current?.historyManager?.markDirty();
-      drawStrokeSegment(x, y, x, y, pointerPressure, pointerPressure);
+
+      if (toolRef.current === 'brush') {
+        resetPenVelocity(e.pointerId);
+        penBuffersRef.current.set(e.pointerId, []);
+        penStrokeCountRef.current.set(e.pointerId, 0);
+        const r = penRadius(brushRadiusRef.current, pointerPressure, 0, 0.5);
+        drawPenDot(contextRef.current!, x, y, r, brushColorRef.current);
+        penBuffersRef.current.get(e.pointerId)!.push({ x, y, r });
+        penStrokeCountRef.current.set(e.pointerId, 1);
+      } else {
+        drawStrokeSegment(x, y, x, y, pointerPressure, pointerPressure);
+      }
+
       updateCursorDot(e.clientX, e.clientY);
     };
 
@@ -258,7 +279,30 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       pointerData.lastX = x;
       pointerData.lastY = y;
 
-      drawStrokeSegment(lastX, lastY, x, y, lastPressure, currentPressure);
+      if (toolRef.current === 'brush') {
+        const velocity = trackPenVelocity(e.pointerId, x, y);
+        const count = penStrokeCountRef.current.get(e.pointerId) ?? 0;
+        const taperT = Math.min(1, (count + 1) / 5);
+        const r = penRadius(brushRadiusRef.current, currentPressure, velocity, taperT);
+        const buf = penBuffersRef.current.get(e.pointerId) ?? [];
+        const newPt: PenPoint = { x, y, r };
+
+        penStrokeCountRef.current.set(e.pointerId, count + 1);
+
+        if (buf.length >= 2) {
+          drawPenBezier(contextRef.current!, buf[buf.length - 2], buf[buf.length - 1], newPt, brushColorRef.current);
+        } else if (buf.length === 1) {
+          drawPenLine(contextRef.current!, buf[0], newPt, brushColorRef.current);
+        } else {
+          drawPenDot(contextRef.current!, x, y, r, brushColorRef.current);
+        }
+
+        buf.push(newPt);
+        if (buf.length > 3) buf.shift();
+        penBuffersRef.current.set(e.pointerId, buf);
+      } else {
+        drawStrokeSegment(lastX, lastY, x, y, lastPressure, currentPressure);
+      }
     };
 
     const stopDrawing = (e: PointerEvent) => {
@@ -270,6 +314,8 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
 
       activePointersRef.current.delete(e.pointerId);
       pointerDataRef.current.delete(e.pointerId);
+      penBuffersRef.current.delete(e.pointerId);
+      penStrokeCountRef.current.delete(e.pointerId);
 
       if (activePointersRef.current.size === 0) {
         contextRef.current!.closePath();

@@ -206,6 +206,112 @@ export function drawRect(ctx: CanvasRenderingContext2D, x1: number, y1: number, 
   ctx.restore();
 }
 
+// ---- Realistic pen tool: velocity-based width + Bezier smoothing ----
+
+const _penVelCache = new Map<number, number>();
+const _penTimeCache = new Map<number, number>();
+const _penPosCache = new Map<number, { x: number; y: number }>();
+const PEN_MAX_SPEED = 500; // px/s at which stroke reaches its thinnest
+
+export function resetPenVelocity(pointerId: number): void {
+  _penVelCache.delete(pointerId);
+  _penTimeCache.delete(pointerId);
+  _penPosCache.delete(pointerId);
+}
+
+export function trackPenVelocity(pointerId: number, x: number, y: number): number {
+  const now = performance.now();
+  const prevTime = _penTimeCache.get(pointerId);
+  const prevPos = _penPosCache.get(pointerId);
+  _penTimeCache.set(pointerId, now);
+  _penPosCache.set(pointerId, { x, y });
+  if (prevTime === undefined || !prevPos) return 0;
+  const dt = Math.max(1, now - prevTime);
+  const speed = Math.hypot(x - prevPos.x, y - prevPos.y) / dt * 1000;
+  const raw = Math.min(1, speed / PEN_MAX_SPEED);
+  const prev = _penVelCache.get(pointerId) ?? 0;
+  const v = prev * 0.7 + raw * 0.3;
+  _penVelCache.set(pointerId, v);
+  return v;
+}
+
+export interface PenPoint { x: number; y: number; r: number; }
+
+/** Returns the stroke radius from base size, pressure, velocity, and taper (0–1). */
+export function penRadius(baseSize: number, press: number, velocity: number, taperT: number): number {
+  const velFactor = 1 - velocity * 0.6; // fast movement thins the stroke
+  const pressFactor = 0.22 + press * 0.9;
+  return Math.max(0.25, (baseSize / 2) * pressFactor * velFactor * taperT);
+}
+
+export function drawPenDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(0.25, r), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draw a smooth quadratic Bezier segment through midpoints of p0→p1 and p1→p2, with interpolated radius. */
+export function drawPenBezier(
+  ctx: CanvasRenderingContext2D,
+  p0: PenPoint, p1: PenPoint, p2: PenPoint,
+  color: string,
+): void {
+  const m0x = (p0.x + p1.x) / 2;
+  const m0y = (p0.y + p1.y) / 2;
+  const m1x = (p1.x + p2.x) / 2;
+  const m1y = (p1.y + p2.y) / 2;
+  const dist = Math.hypot(m1x - m0x, m1y - m0y);
+  if (dist < 0.01) {
+    if (p2.r > 0.25) drawPenDot(ctx, p2.x, p2.y, p2.r, color);
+    return;
+  }
+  const avgR = (p0.r + p2.r) / 2;
+  const step = Math.max(0.3, avgR * 0.15);
+  const numSteps = Math.max(1, Math.ceil(dist / step));
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    const it = 1 - t;
+    const bx = it * it * m0x + 2 * it * t * p1.x + t * t * m1x;
+    const by = it * it * m0y + 2 * it * t * p1.y + t * t * m1y;
+    const r = Math.max(0.25, p0.r + (p2.r - p0.r) * t);
+    ctx.moveTo(bx + r, by);
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draw a straight pen segment between two points with interpolated radius. */
+export function drawPenLine(
+  ctx: CanvasRenderingContext2D,
+  p0: PenPoint, p1: PenPoint,
+  color: string,
+): void {
+  const dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+  const avgR = (p0.r + p1.r) / 2;
+  const step = Math.max(0.3, avgR * 0.15);
+  const numSteps = Math.max(1, Math.ceil(dist / step));
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    const x = p0.x + (p1.x - p0.x) * t;
+    const y = p0.y + (p1.y - p0.y) * t;
+    const r = Math.max(0.25, p0.r + (p1.r - p0.r) * t);
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
 export function hexToRGB(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
