@@ -98,8 +98,18 @@ export const useFrameManager = ({
       ? new ImageData(new Uint8ClampedArray(source.data), source.width, source.height)
       : null;
 
-    // Clear stale undo history for the overwritten frame
-    delete frameHistoryRef.current[currentFrame + 1];
+    // Copy live undo/redo history to the next frame (arrays are fresh; ImageData refs are shared
+    // since history snapshots are never mutated after capture)
+    const liveHistory = canvasRef.current?.historyManager?.getFullState?.();
+    if (liveHistory) {
+      frameHistoryRef.current[currentFrame + 1] = {
+        undoStack: [...liveHistory.undoStack],
+        redoStack: [...liveHistory.redoStack],
+        pendingAction: liveHistory.pendingAction,
+      };
+    } else {
+      delete frameHistoryRef.current[currentFrame + 1];
+    }
 
     setThumbnailVersion((v) => v + 1);
     return true;

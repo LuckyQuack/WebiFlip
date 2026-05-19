@@ -239,7 +239,7 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
                 disabled={isPlaying || currentFrame >= FRAME_COUNT}
                 title={currentFrame >= FRAME_COUNT ? 'No next frame' : 'Copy this frame to the next frame'}
               >
-                Copy to Next
+                Copy
               </button>
             </div>
           </div>
