@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import GifBoardGrid from '../GifBoardGrid';
+import GifViewer from '../GifViewer';
 import { listBoardPosts } from '../../utils/gifBoard';
 import { downloadBlob, getGifExportFileName } from '../../utils/gifExport';
 import type { BoardPost } from '../../types';
@@ -99,7 +100,7 @@ const BoardPage = ({ refreshToken, onNavigateToEditor }: BoardPageProps) => {
                 Close
               </button>
             </div>
-            <img src={selectedPost.gifUrl} alt={selectedPost.title} className="board-detail-image" />
+            <GifViewer url={selectedPost.gifUrl} title={selectedPost.title} defaultFps={selectedPost.fps} />
             <div className="board-detail-meta">
               <span>{selectedPost.author || 'anonymous'}</span>
               <span>{selectedPost.frameCount} frames</span>

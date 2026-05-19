@@ -318,10 +318,6 @@ a {
   gap: 8px;
 }
 
-.board-detail-panel {
-  width: min(100%, 720px);
-}
-
 .board-detail-image {
   display: block;
   width: 100%;
@@ -493,5 +489,222 @@ a {
   background: #e8e8e8;
   border-radius: 3px;
   border: 1px solid #ddd;
+}
+
+/* ── GIF Viewer ──────────────────────────────────────────── */
+
+.gif-viewer {
+  display: flex;
+  flex-direction: column;
+  background: #1a1f22;
+}
+
+.gif-viewer-state {
+  min-height: 160px;
+  align-items: center;
+  justify-content: center;
+}
+
+.gif-viewer-state-text {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a9aa3;
+}
+
+.gif-viewer-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111518;
+  min-height: 120px;
+}
+
+.gif-viewer-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 54vh;
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+/* Controls bar */
+.gif-viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 9px 12px;
+  border-top: 1px solid #2d373d;
+  border-bottom: 1px solid #2d373d;
+  background: #1e2529;
+}
+
+.gif-viewer-playback-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gif-viewer-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #3a474f;
+  background: #273035;
+  color: #c8d4da;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+
+.gif-viewer-btn:hover {
+  background: #344049;
+  color: #e8f0f4;
+}
+
+.gif-viewer-btn-play {
+  width: 40px;
+  font-size: 15px;
+  background: #2d3f4a;
+  border-color: #4a5f6b;
+}
+
+.gif-viewer-btn-play:hover {
+  background: #3a5060;
+}
+
+.gif-viewer-frame-count {
+  margin-left: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a8f9a;
+  white-space: nowrap;
+}
+
+.gif-viewer-fps-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.gif-viewer-fps-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6a7e8a;
+  font-weight: 700;
+}
+
+.gif-viewer-fps-slider {
+  width: 90px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #3a474f;
+  outline: none;
+  cursor: pointer;
+  accent-color: #6aa0ba;
+}
+
+.gif-viewer-fps-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6aa0ba;
+  cursor: pointer;
+  border: 1px solid #4a7a94;
+}
+
+.gif-viewer-fps-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6aa0ba;
+  cursor: pointer;
+  border: 1px solid #4a7a94;
+}
+
+.gif-viewer-fps-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0d0d8;
+  min-width: 18px;
+  text-align: right;
+}
+
+/* Frame scrubber strip */
+.gif-viewer-scrubber {
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  background: #161b1e;
+  scrollbar-width: thin;
+  scrollbar-color: #3a474f #1a1f22;
+}
+
+.gif-viewer-scrubber::-webkit-scrollbar {
+  height: 4px;
+}
+
+.gif-viewer-scrubber::-webkit-scrollbar-track {
+  background: #1a1f22;
+}
+
+.gif-viewer-scrubber::-webkit-scrollbar-thumb {
+  background: #3a474f;
+}
+
+.gif-viewer-thumb {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+
+.gif-viewer-thumb:hover {
+  border-color: #5a7a8a;
+}
+
+.gif-viewer-thumb-active {
+  border-color: #6aa0ba !important;
+  background: #1e2d36;
+}
+
+.gif-viewer-thumb-canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.gif-viewer-thumb-num {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: #5a6e78;
+  line-height: 1;
+}
+
+.gif-viewer-thumb-active .gif-viewer-thumb-num {
+  color: #6aa0ba;
+}
+
+/* Wider detail panel to fit the viewer + scrubber */
+.board-detail-panel {
+  width: min(100%, 840px);
 }
 
