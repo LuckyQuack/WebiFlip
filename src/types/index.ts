@@ -67,4 +67,4 @@ export interface CreateBoardPostOptions {
   frameCount: number;
 }
 
-export type DrawingTool = 'brush' | 'eraser';
+export type DrawingTool = 'brush' | 'eraser' | 'lasso-fill';

@@ -37,7 +37,7 @@ export const useKeyboardShortcuts = ({
 
       const isUndo = ctrl && key === 'z';
       const isRedo = ctrl && key === 'y';
-      const isTool = bare && (key === 'p' || key === 'e');
+      const isTool = bare && (key === 'p' || key === 'e' || key === 'l');
       const isPlay = bare && e.code === 'Space';
       const isFrame = bare && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
       const isOnion = bare && key === 'o';
@@ -48,7 +48,7 @@ export const useKeyboardShortcuts = ({
 
       if (isUndo) canvasRef.current?.undo();
       else if (isRedo) canvasRef.current?.redo();
-      else if (isTool) onSetTool(key === 'p' ? 'brush' : 'eraser');
+      else if (isTool) onSetTool(key === 'p' ? 'brush' : key === 'e' ? 'eraser' : 'lasso-fill');
       else if (isPlay && !e.repeat) onTogglePlay();
       else if (isFrame) {
         if (e.key === 'ArrowLeft') onMoveLeft();

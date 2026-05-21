@@ -35,7 +35,7 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
 
   const canvasRef = useRef<CanvasHandle>(null);
   const frameStatesRef = useRef<Record<number, ImageData | null>>({});
-  const brushRadius = brushRadii[tool] ?? brushRadii.brush;
+  const brushRadius = tool === 'lasso-fill' ? brushRadii.brush : brushRadii[tool];
 
   const { brushColor, hsv, setBrushColor, handleHueChange, handleSaturationChange, handleValueChange } = useColorPicker();
 
@@ -139,6 +139,9 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
           <button type="button" className={`tool-button ${tool === 'eraser' ? 'active' : ''}`} onClick={() => setTool('eraser')}>
             Eraser
           </button>
+          <button type="button" className={`tool-button ${tool === 'lasso-fill' ? 'active' : ''}`} onClick={() => setTool('lasso-fill')}>
+            Lasso Fill
+          </button>
         </div>
 
         <div className="sidebar-block color-preview-block">
@@ -170,14 +173,16 @@ const Home = ({ isActive = true, onPostCreated, onNavigateToBoard }: HomeProps) 
           </div>
         </div>
 
-        <div className="sidebar-block brush-size-block">
-          <label className="brush-size-label">Brush Size: {brushRadius}</label>
-          <input
-            type="range" min="1" max="100" value={brushRadius}
-            onChange={(e) => setBrushRadii((prev) => ({ ...prev, [tool]: Number(e.target.value) }))}
-            className="brush-size-slider"
-          />
-        </div>
+        {tool !== 'lasso-fill' && (
+          <div className="sidebar-block brush-size-block">
+            <label className="brush-size-label">Brush Size: {brushRadius}</label>
+            <input
+              type="range" min="1" max="100" value={brushRadius}
+              onChange={(e) => setBrushRadii((prev) => ({ ...prev, [tool]: Number(e.target.value) }))}
+              className="brush-size-slider"
+            />
+          </div>
+        )}
 
         <div className="sidebar-block checkbox-group">
           <label className="checkbox-item">

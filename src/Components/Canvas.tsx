@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import {
   drawPressureLine,
   resetPenVelocity, trackPenVelocity, penRadius,
-  drawPenDot, drawPenBezier, drawPenLine,
+  drawPenDot, drawPenBezier, drawPenLine, fillPolygon,
   type PenPoint,
 } from '../utils/drawingEngine';
 import { HistoryManager } from '../utils/historyManager';
@@ -65,6 +65,9 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
     const brushRadiusRef = useRef(brushRadius);
     const penBuffersRef = useRef(new Map<number, PenPoint[]>());
     const penStrokeCountRef = useRef(new Map<number, number>());
+    const lassoOverlayCanvasRef = useRef<HTMLCanvasElement>(null);
+    const lassoOverlayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+    const lassoPointsRef = useRef<{ x: number; y: number }[]>([]);
 
     const drawImageDataWithAlpha = (context: CanvasRenderingContext2D, imageData: ImageData, alpha: number) => {
       const offscreen = offscreenCanvasRef.current;
@@ -127,6 +130,12 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       onionCanvas.width = canvasWidth;
       onionCanvas.height = canvasHeight;
 
+      if (lassoOverlayCanvasRef.current) {
+        lassoOverlayCanvasRef.current.width = canvasWidth;
+        lassoOverlayCanvasRef.current.height = canvasHeight;
+        lassoOverlayCtxRef.current = lassoOverlayCanvasRef.current.getContext('2d');
+      }
+
       const context = canvas.getContext('2d', { willReadFrequently: true })!;
       const onionSkinContext = onionCanvas.getContext('2d', { willReadFrequently: true })!;
       context.lineCap = 'round';
@@ -137,6 +146,40 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       renderCurrentFrame(frameStateRef.current);
       renderOnionSkin(onionSkinStateRef.current.imageData, onionSkinStateRef.current.enabled);
     }, [canvasWidth, canvasHeight, renderCurrentFrame, renderOnionSkin]);
+
+    const clearLassoOverlay = () => {
+      const ctx = lassoOverlayCtxRef.current;
+      const canvas = lassoOverlayCanvasRef.current;
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    const drawLassoPreview = () => {
+      const ctx = lassoOverlayCtxRef.current;
+      const canvas = lassoOverlayCanvasRef.current;
+      if (!ctx || !canvas) return;
+      const points = lassoPointsRef.current;
+      if (points.length < 2) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    };
 
     const finishActiveStroke = useCallback(() => {
       const didCommit = historyManagerRef.current.commitAction(canvasRef.current);
@@ -160,6 +203,8 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       penBuffersRef.current.clear();
       penStrokeCountRef.current.clear();
       isDrawingRef.current = false;
+      lassoPointsRef.current = [];
+      clearLassoOverlay();
       finishActiveStroke();
       hideCursorDot();
     }, [finishActiveStroke]);
@@ -231,10 +276,16 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
 
       try { canvasRef.current!.setPointerCapture(e.pointerId); } catch { /* ignore */ }
 
-      contextRef.current!.beginPath();
-      contextRef.current!.moveTo(x, y);
       isDrawingRef.current = true;
 
+      if (toolRef.current === 'lasso-fill') {
+        lassoPointsRef.current = [{ x, y }];
+        updateCursorDot(e.clientX, e.clientY);
+        return;
+      }
+
+      contextRef.current!.beginPath();
+      contextRef.current!.moveTo(x, y);
       imperativeRef?.current?.historyManager?.markDirty();
 
       if (toolRef.current === 'brush') {
@@ -265,6 +316,17 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
           startDrawing(e, previousPoint);
         }
         if (!isDrawingRef.current || !activePointersRef.current.has(e.pointerId)) return;
+      }
+
+      if (toolRef.current === 'lasso-fill') {
+        const { x, y } = getCanvasPos(e.clientX, e.clientY);
+        const pts = lassoPointsRef.current;
+        const last = pts[pts.length - 1];
+        if (!last || Math.hypot(x - last.x, y - last.y) >= 2) {
+          pts.push({ x, y });
+          drawLassoPreview();
+        }
+        return;
       }
 
       imperativeRef?.current?.historyManager?.markDirty();
@@ -318,6 +380,16 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
       penStrokeCountRef.current.delete(e.pointerId);
 
       if (activePointersRef.current.size === 0) {
+        if (toolRef.current === 'lasso-fill') {
+          const points = lassoPointsRef.current;
+          if (points.length >= 3 && contextRef.current) {
+            fillPolygon(contextRef.current, points, brushColorRef.current);
+            imperativeRef?.current?.historyManager?.markDirty();
+          }
+          clearLassoOverlay();
+          lassoPointsRef.current = [];
+        }
+
         contextRef.current!.closePath();
         isDrawingRef.current = false;
         imperativeRef?.current?.historyManager?.commitAction(canvasRef.current);
@@ -473,6 +545,17 @@ const Canvas = React.forwardRef<CanvasHandle, CanvasProps>(
             display: 'block',
             pointerEvents: 'none',
             backgroundColor: '#fff',
+          }}
+        />
+        <canvas
+          ref={lassoOverlayCanvasRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'block',
+            pointerEvents: 'none',
+            zIndex: 2,
           }}
         />
         <canvas
